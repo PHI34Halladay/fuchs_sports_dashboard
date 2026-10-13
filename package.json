@@ -1,0 +1,12 @@
+{
+  "name": "espn-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Browser-Dashboard für Spielstände, Tabellen und News aus der öffentlichen ESPN-API",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

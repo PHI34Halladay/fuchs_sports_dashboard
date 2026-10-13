@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0d1117" />
+  <title>Sport Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='44' fill='%23e5484d'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-dot"></span>
+      <span class="brand-name">Sport Dashboard</span>
+    </div>
+    <nav class="leagues" id="leagues" aria-label="Ligen"></nav>
+  </header>
+
+  <main class="container">
+    <div class="toolbar">
+      <div class="tabs" role="tablist" id="tabs">
+        <button role="tab" data-tab="scores" class="tab">Spiele</button>
+        <button role="tab" data-tab="standings" class="tab">Tabelle</button>
+        <button role="tab" data-tab="news" class="tab">News</button>
+      </div>
+
+      <div class="controls" id="scoreControls">
+        <div class="datenav">
+          <button class="icon-btn" id="prevDay" title="Vorheriger Tag" aria-label="Vorheriger Tag">‹</button>
+          <label class="date-label">
+            <span id="dateText">Aktuell</span>
+            <input type="date" id="dateInput" aria-label="Datum wählen" />
+          </label>
+          <button class="icon-btn" id="nextDay" title="Nächster Tag" aria-label="Nächster Tag">›</button>
+          <button class="chip-btn" id="todayBtn">Aktuell</button>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="favOnly" />
+          <span>Nur Favoriten</span>
+        </label>
+        <button class="icon-btn" id="refreshBtn" title="Aktualisieren" aria-label="Aktualisieren">↻</button>
+      </div>
+    </div>
+
+    <div id="status" class="status" hidden></div>
+    <section id="content" aria-live="polite"></section>
+  </main>
+
+  <footer class="footer">
+    <span>Daten: ESPN (inoffizielle öffentliche API) · Zeiten in deiner Ortszeit</span>
+    <span id="updated"></span>
+    <span class="version">Version <span id="version"></span></span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
