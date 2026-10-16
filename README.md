@@ -20,6 +20,10 @@ Gehostet auf Vercel, Code auf GitHub – ohne Build-Schritt, ohne Abhängigkeite
   - *Andere Ligen:* allgemeine Übersicht (Linescore, Teamstatistik, Videos, Spielbericht) – eigene Ansichten folgen
   - Laufende Spiele aktualisieren sich im Popup alle 30 s
 - **Tabellen bei NCAAF/NCAAM:** AP Top 25 wird oben in der Tabellenansicht eingeblendet (Rang, Bilanz, Punkte, Trend)
+- **Spieler- & Team-Popups:** Jeder Spielername (Boxscore, Three Stars/Pitching-Entscheidung, Torfolge, Topspieler, Vorschau) und jedes Team (Spielkarte, Gamecast-Kopf, Tabellen, Top 25) ist anklickbar und öffnet ein eigenes Profil-Popup:
+  - *Spieler:* Foto, Rückennummer/Position, Status, Körpergröße/-gewicht, Alter, Geburtsort, Erfahrung, Draft, Hand, aktuelle Saisonstatistik, Verletzungsstatus
+  - *Team:* Logo, Tabellenplatz, Bilanz (gesamt/Heim/Auswärts), nächstes Spiel – eingefärbt in den Vereinsfarben des Teams (Akzentfarbe & Kopfbereich-Verlauf), damit jedes Team-Popup individuell wirkt
+  - Aus dem Spieler-Popup heraus ist das Team ebenfalls anklickbar (verschachteltes Popup)
 - Versionsnummer unten auf der Seite
 
 ## Aufbau
@@ -30,6 +34,7 @@ espn-dashboard/
 ├── styles.css      Design (dunkles Theme, mobil optimiert)
 ├── app.js          Frontend-Logik
 ├── gamecast.js     Spiel-Popup (Gamecast, Boxscore, Bericht)
+├── profile.js      Spieler-/Team-Popup (Profilseite, Teamfarben als Akzent)
 ├── api/
 │   └── espn.js     Vercel-Function: Proxy zur ESPN-API (CORS + Caching)
 ├── vercel.json     Vercel-Einstellungen
@@ -49,6 +54,8 @@ Verwendete ESPN-Endpunkte:
 | news | `site.api.espn.com/apis/site/v2/sports/{sport}/{league}/news` |
 | summary | `site.api.espn.com/apis/site/v2/sports/{sport}/{league}/summary?event={id}` |
 | rankings | `site.api.espn.com/apis/site/v2/sports/{sport}/{league}/rankings` (AP Top 25 für NCAAF/NCAAM) |
+| team | `site.api.espn.com/apis/site/v2/sports/{sport}/{league}/teams/{id}` (Team-Popup) |
+| athlete | `site.web.api.espn.com/apis/common/v3/sports/{sport}/{league}/athletes/{id}` (Spieler-Popup) |
 
 ## Deployment
 

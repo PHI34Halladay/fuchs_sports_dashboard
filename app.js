@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '1.3.0';
+  const VERSION = '1.4.0';
 
   // ---------- Konfiguration ----------
   // Weitere Ligen einfach hier ergänzen (sport/league = ESPN-Pfad).
@@ -221,8 +221,8 @@
       return `
         <div class="team-row${loser ? ' loser' : ''}">
           <button class="star${isFav(t.id) ? ' on' : ''}" data-fav="${esc(t.id)}" title="Favorit umschalten" aria-label="${esc(t.displayName)} als Favorit">★</button>
-          ${t.logo ? `<img src="${esc(t.logo)}" alt="" loading="lazy">` : '<span></span>'}
-          <div class="team-name">${rank}${esc(soccer ? t.shortDisplayName || t.displayName : t.displayName)}${rec ? `<span class="team-rec">${esc(rec)}</span>` : ''}</div>
+          ${t.logo ? `<img class="gc-link" data-team-id="${esc(t.id)}" src="${esc(t.logo)}" alt="" loading="lazy">` : '<span></span>'}
+          <div class="team-name gc-link" data-team-id="${esc(t.id)}">${rank}${esc(soccer ? t.shortDisplayName || t.displayName : t.displayName)}${rec ? `<span class="team-rec">${esc(rec)}</span>` : ''}</div>
           <div class="score">${showScore ? esc(c.score ?? '') : ''}</div>
         </div>`;
     }).join('');
@@ -248,7 +248,7 @@
     const list = (comp.leaders || []).slice(0, 3).map((cat) => {
       const l = cat.leaders?.[0];
       if (!l?.athlete) return '';
-      return `<div>${esc(cat.shortDisplayName || cat.abbreviation)}: <b>${esc(l.athlete.shortName || l.athlete.displayName)}</b> ${esc(l.displayValue)}</div>`;
+      return `<div>${esc(cat.shortDisplayName || cat.abbreviation)}: <b class="gc-link" data-player-id="${esc(l.athlete.id)}">${esc(l.athlete.shortName || l.athlete.displayName)}</b> ${esc(l.displayValue)}</div>`;
     }).filter(Boolean);
     return list.length ? `<div class="leaders">${list.join('')}</div>` : '';
   }
@@ -309,7 +309,7 @@
       const trend = r.trend === '-' || !r.trend ? '' : /^\+/.test(r.trend) ? `<span class="rank-up">▲ ${esc(r.trend.slice(1))}</span>` : r.trend === 'NR' ? '' : `<span class="rank-down">▼ ${esc(r.trend.slice(1))}</span>`;
       return `<tr class="${isFav(t.id) ? 'fav' : ''}">
         <td>${esc(r.current)}</td>
-        <td class="team-cell">${logo ? `<img src="${esc(logo)}" alt="" loading="lazy">` : ''}<span>${esc(name)}</span></td>
+        <td class="team-cell gc-link" data-team-id="${esc(t.id)}">${logo ? `<img src="${esc(logo)}" alt="" loading="lazy">` : ''}<span>${esc(name)}</span></td>
         <td>${esc(r.recordSummary || '')}</td>
         <td>${esc(r.points ?? '')}</td>
         <td>${trend}</td>
@@ -370,7 +370,7 @@
         }).join('');
         return `<tr class="${isFav(t.id) ? 'fav' : ''}">
           <td>${mark}${i + 1}</td>
-          <td class="team-cell">${logo ? `<img src="${esc(logo)}" alt="" loading="lazy">` : ''}<span>${esc(sport === 'soccer' ? t.shortDisplayName || t.displayName : t.displayName)}</span></td>
+          <td class="team-cell gc-link" data-team-id="${esc(t.id)}">${logo ? `<img src="${esc(logo)}" alt="" loading="lazy">` : ''}<span>${esc(sport === 'soccer' ? t.shortDisplayName || t.displayName : t.displayName)}</span></td>
           ${cells}
         </tr>`;
       }).join('');
@@ -493,6 +493,10 @@
 
   // Favoriten-Stern und Spielkarte (Event-Delegation)
   el.content.addEventListener('click', (e) => {
+    const teamEl = e.target.closest('[data-team-id]');
+    if (teamEl) { window.Profile.openTeam(teamEl.dataset.teamId); return; }
+    const playerEl = e.target.closest('[data-player-id]');
+    if (playerEl) { window.Profile.openPlayer(playerEl.dataset.playerId); return; }
     const star = e.target.closest('[data-fav]');
     if (star) {
       const key = favKey(star.dataset.fav);
@@ -522,6 +526,7 @@
 
   // ---------- Start ----------
   window.Gamecast.init({ api, esc, league: currentLeague, isFav });
+  window.Profile.init({ api, esc });
   el.version.textContent = VERSION;
   renderLeagueButtons();
   load();

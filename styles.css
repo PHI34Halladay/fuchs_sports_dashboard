@@ -378,3 +378,69 @@ dialog.gc::backdrop { background: rgba(0, 0, 0, .65); backdrop-filter: blur(3px)
   .gc-leaders { grid-template-columns: 1fr; }
   .gc-rink-team { margin: 4px 10%; font-size: 10px; }
 }
+
+/* ---------- Klickbare Spieler/Teams ---------- */
+.gc-link { cursor: pointer; border-radius: 6px; transition: background-color .15s, color .15s; }
+.gc-link:hover { background: rgba(255, 255, 255, .08); color: var(--text); }
+button.gc-link { background: none; border: 0; padding: 0; font: inherit; text-align: inherit; color: inherit; display: inherit; }
+.gc-team.gc-link:hover { background: rgba(255, 255, 255, .06); }
+.gc-sec-team.gc-link:hover, .gc-leaders-team.gc-link:hover, .gc-box-group.gc-link:hover { background: rgba(255, 255, 255, .08); padding: 2px 6px; margin: -2px -6px; }
+td.team-cell.gc-link:hover span { text-decoration: underline; }
+img.gc-link:hover { filter: brightness(1.25); }
+.team-row .team-name.gc-link:hover { text-decoration: underline; }
+
+/* ---------- Profil-Popup (Spieler/Team) ---------- */
+dialog.pf {
+  --pf-accent: #8b96a5;
+  --pf-brand-rgb: 48, 54, 61;
+  padding: 0; border: 1px solid var(--border); border-radius: 16px;
+  background: var(--bg); color: var(--text);
+  width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 48px);
+  overflow: hidden;
+}
+dialog.pf::backdrop { background: rgba(0, 0, 0, .7); backdrop-filter: blur(3px); }
+.pf-shell { display: flex; flex-direction: column; max-height: calc(100dvh - 48px); position: relative; }
+.pf-close {
+  position: absolute; top: 10px; right: 10px; z-index: 2;
+  width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); font-size: 22px; line-height: 1;
+}
+.pf-close:hover { border-color: var(--muted); }
+.pf-scroll { overflow-y: auto; flex: 1; overscroll-behavior: contain; }
+.pf-head {
+  padding: 22px 20px 18px;
+  background: linear-gradient(160deg, rgba(var(--pf-brand-rgb), .32), var(--surface) 72%);
+  border-bottom: 2px solid var(--pf-accent);
+}
+.pf-player-head, .pf-team-head { display: flex; align-items: center; gap: 14px; }
+.pf-headshot { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; background: var(--surface-2); border: 2px solid var(--pf-accent); flex-shrink: 0; }
+.pf-headshot-ph { background: var(--surface-2); }
+.pf-team-logo { width: 64px; height: 64px; object-fit: contain; flex-shrink: 0; }
+.pf-info { min-width: 0; }
+.pf-name { font-family: var(--display); font-size: 22px; font-weight: 700; line-height: 1.15; }
+.pf-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.pf-status { color: var(--pf-accent); font-weight: 600; }
+.pf-team-chip {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 8px;
+  background: var(--surface); border: 1px solid var(--pf-accent); border-radius: 999px;
+  padding: 3px 10px 3px 4px; font-size: 12px; font-weight: 600; color: var(--text);
+  cursor: pointer;
+}
+.pf-team-chip:hover { background: var(--surface-2); }
+.pf-team-chip img { width: 18px; height: 18px; object-fit: contain; }
+.pf-body { padding: 16px 20px 20px; }
+.pf-sec { margin-bottom: 20px; }
+.pf-sec h3 { font-family: var(--display); font-size: 15px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: var(--pf-accent); margin: 0 0 10px; }
+.pf-bio { font-size: 13px; }
+.pf-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 10px; }
+.pf-stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 6px; text-align: center; }
+.pf-stat-val { font-family: var(--display); font-size: 20px; font-weight: 700; color: var(--pf-accent); }
+.pf-stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .3px; margin-top: 2px; }
+
+@media (max-width: 640px) {
+  dialog.pf { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; border-radius: 0; border: 0; margin: 0; }
+  .pf-shell { max-height: 100dvh; height: 100dvh; }
+  .pf-head { padding: 54px 14px 16px; }
+  .pf-headshot, .pf-team-logo { width: 56px; height: 56px; }
+  .pf-name { font-size: 18px; }
+}
