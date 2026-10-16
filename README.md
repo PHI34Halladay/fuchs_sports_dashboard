@@ -11,6 +11,11 @@ Gehostet auf Vercel, Code auf GitHub – ohne Build-Schritt, ohne Abhängigkeite
 - **Favoriten:** Stern neben einem Team setzen → Spiele werden hervorgehoben und oben einsortiert, Filter „Nur Favoriten“ (gespeichert im Browser)
 - **Tabellen:** je Liga passende Spalten, Conferences/Gruppen getrennt, Qualifikations-Markierungen im Fußball
 - **News:** aktuelle Artikel und Videos je Liga
+- **Spiel-Popup (Klick auf eine Karte):**
+  - *NHL:* Gamecast mit Three Stars, Torfolge (inkl. PP/SH/EN), Shot Chart nach Drittel, Teamstatistik-Vergleich, Strafen, Spielinfo · Play-by-Play (filterbar) · Boxscore (Stürmer, Verteidiger, Torhüter) · Spielbericht
+  - *Vor Spielbeginn (alle Ligen):* Vorschau mit Saisonduell, Form, voraussichtlichen Torhütern, Topspielern, Ausfällen
+  - *Andere Ligen:* allgemeine Übersicht (Linescore, Teamstatistik, Spielbericht) – eigene Ansichten folgen
+  - Laufende Spiele aktualisieren sich im Popup alle 30 s
 - Versionsnummer unten auf der Seite
 
 ## Aufbau
@@ -20,6 +25,7 @@ espn-dashboard/
 ├── index.html      Seitengerüst
 ├── styles.css      Design (dunkles Theme, mobil optimiert)
 ├── app.js          Frontend-Logik
+├── gamecast.js     Spiel-Popup (Gamecast, Boxscore, Bericht)
 ├── api/
 │   └── espn.js     Vercel-Function: Proxy zur ESPN-API (CORS + Caching)
 ├── vercel.json     Vercel-Einstellungen
@@ -37,6 +43,7 @@ Verwendete ESPN-Endpunkte:
 | scoreboard | `site.api.espn.com/apis/site/v2/sports/{sport}/{league}/scoreboard?dates=YYYYMMDD` |
 | standings | `site.api.espn.com/apis/v2/sports/{sport}/{league}/standings` |
 | news | `site.api.espn.com/apis/site/v2/sports/{sport}/{league}/news` |
+| summary | `site.api.espn.com/apis/site/v2/sports/{sport}/{league}/summary?event={id}` |
 
 ## Deployment
 

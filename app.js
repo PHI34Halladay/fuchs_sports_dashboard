@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '1.0.0';
+  const VERSION = '1.1.0';
 
   // ---------- Konfiguration ----------
   // Weitere Ligen einfach hier ergänzen (sport/league = ESPN-Pfad).
@@ -233,7 +233,7 @@
     const link = (ev.links || []).find((l) => l.rel?.includes('summary'))?.href;
 
     return `
-      <article class="game${fav ? ' fav' : ''}${stateName === 'in' ? ' live' : ''}">
+      <article class="game${fav ? ' fav' : ''}${stateName === 'in' ? ' live' : ''}" data-event="${esc(ev.id)}" data-link="${esc(link || '')}" tabindex="0" role="button" aria-label="${esc(ev.name || ev.shortName || 'Spiel')} – Details öffnen">
         <div class="game-status">${statusHtml}${note ? `<span class="note">${esc(note)}</span>` : ''}</div>
         ${rows}
         ${leaders}
@@ -456,15 +456,29 @@
   });
   el.refreshBtn.addEventListener('click', () => load());
 
-  // Favoriten-Stern (Event-Delegation)
+  // Favoriten-Stern und Spielkarte (Event-Delegation)
   el.content.addEventListener('click', (e) => {
     const star = e.target.closest('[data-fav]');
-    if (!star) return;
-    const key = favKey(star.dataset.fav);
-    if (favorites.has(key)) favorites.delete(key); else favorites.add(key);
-    writeJSON(LS_FAV, [...favorites]);
-    loadScores({ silent: true });
+    if (star) {
+      const key = favKey(star.dataset.fav);
+      if (favorites.has(key)) favorites.delete(key); else favorites.add(key);
+      writeJSON(LS_FAV, [...favorites]);
+      loadScores({ silent: true });
+      return;
+    }
+    if (e.target.closest('a')) return; // ESPN-Link normal öffnen
+    const card = e.target.closest('.game[data-event]');
+    if (card) openGame(card);
   });
+  el.content.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const card = e.target.closest?.('.game[data-event]');
+    if (card && e.target === card) { e.preventDefault(); openGame(card); }
+  });
+
+  function openGame(card) {
+    window.Gamecast.open(card.dataset.event, { link: card.dataset.link || null });
+  }
 
   // Beim Zurückkehren zum Tab sofort aktualisieren, falls auf "Spiele"
   document.addEventListener('visibilitychange', () => {
@@ -472,6 +486,7 @@
   });
 
   // ---------- Start ----------
+  window.Gamecast.init({ api, esc, league: currentLeague, isFav });
   el.version.textContent = VERSION;
   renderLeagueButtons();
   load();
