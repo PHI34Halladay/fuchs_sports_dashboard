@@ -305,10 +305,11 @@
     const rows = ranks.map((r) => {
       const t = r.team || {};
       const logo = t.logos?.[0]?.href || t.logo;
+      const name = t.displayName || [t.location, t.name].filter(Boolean).join(' ') || t.nickname || t.abbreviation || '';
       const trend = r.trend === '-' || !r.trend ? '' : /^\+/.test(r.trend) ? `<span class="rank-up">▲ ${esc(r.trend.slice(1))}</span>` : r.trend === 'NR' ? '' : `<span class="rank-down">▼ ${esc(r.trend.slice(1))}</span>`;
       return `<tr class="${isFav(t.id) ? 'fav' : ''}">
         <td>${esc(r.current)}</td>
-        <td class="team-cell">${logo ? `<img src="${esc(logo)}" alt="" loading="lazy">` : ''}<span>${esc(t.displayName)}</span></td>
+        <td class="team-cell">${logo ? `<img src="${esc(logo)}" alt="" loading="lazy">` : ''}<span>${esc(name)}</span></td>
         <td>${esc(r.recordSummary || '')}</td>
         <td>${esc(r.points ?? '')}</td>
         <td>${trend}</td>
