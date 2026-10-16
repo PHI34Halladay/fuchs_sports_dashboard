@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '1.2.0';
+  const VERSION = '1.3.0';
 
   // ---------- Konfiguration ----------
   // Weitere Ligen einfach hier ergänzen (sport/league = ESPN-Pfad).
@@ -275,20 +275,53 @@
     ],
   };
 
+  const RANKED_LEAGUES = new Set(['cfb', 'cbb']);
+
   async function loadStandings() {
     const id = ++requestId;
     clearTimeout(refreshTimer);
     skeleton(3); showStatus('');
+    const wantsRankings = RANKED_LEAGUES.has(state.leagueId);
     try {
-      const data = await api('standings');
+      const [data, rankings] = await Promise.all([
+        api('standings'),
+        wantsRankings ? api('rankings').catch(() => null) : Promise.resolve(null),
+      ]);
       if (id !== requestId) return;
-      renderStandings(data);
+      renderStandings(data, rankings);
       setUpdated();
     } catch (e) {
       if (id !== requestId) return;
       el.content.innerHTML = '';
       showStatus(`Tabelle konnte nicht geladen werden: ${e.message}`, true);
     }
+  }
+
+  // AP Top 25 (NCAAF/NCAAM) als eigene Liste oben in der Tabelle
+  function top25Html(rankings) {
+    const poll = (rankings?.rankings || []).find((r) => r.name === 'AP Top 25') || rankings?.rankings?.[0];
+    const ranks = poll?.ranks || [];
+    if (!ranks.length) return '';
+    const rows = ranks.map((r) => {
+      const t = r.team || {};
+      const logo = t.logos?.[0]?.href || t.logo;
+      const trend = r.trend === '-' || !r.trend ? '' : /^\+/.test(r.trend) ? `<span class="rank-up">▲ ${esc(r.trend.slice(1))}</span>` : r.trend === 'NR' ? '' : `<span class="rank-down">▼ ${esc(r.trend.slice(1))}</span>`;
+      return `<tr class="${isFav(t.id) ? 'fav' : ''}">
+        <td>${esc(r.current)}</td>
+        <td class="team-cell">${logo ? `<img src="${esc(logo)}" alt="" loading="lazy">` : ''}<span>${esc(t.displayName)}</span></td>
+        <td>${esc(r.recordSummary || '')}</td>
+        <td>${esc(r.points ?? '')}</td>
+        <td>${trend}</td>
+      </tr>`;
+    }).join('');
+    return `
+      <div class="standings-group top25">
+        <h2 class="group-title">${esc(poll?.name || 'AP Top 25')}</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>#</th><th>Team</th><th>Bilanz</th><th>Punkte</th><th>Trend</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>
+      </div>`;
   }
 
   // Sammelt alle Gruppen mit Einträgen (Ligen sind unterschiedlich tief verschachtelt)
@@ -301,10 +334,11 @@
   const stat = (entry, name) => entry.stats?.find((s) => s.name === name);
   const statVal = (entry, name) => stat(entry, name)?.value;
 
-  function renderStandings(data) {
+  function renderStandings(data, rankings) {
     const groups = collectGroups(data);
+    const top25 = rankings ? top25Html(rankings) : '';
     if (!groups.length) {
-      el.content.innerHTML = '<div class="empty">Für diese Liga ist aktuell keine Tabelle verfügbar.</div>';
+      el.content.innerHTML = top25 || '<div class="empty">Für diese Liga ist aktuell keine Tabelle verfügbar.</div>';
       return;
     }
     const sport = currentLeague().sport;
@@ -355,7 +389,7 @@
         </div>`;
     }).join('');
 
-    el.content.innerHTML = html;
+    el.content.innerHTML = top25 + html;
   }
 
   function sortEntries(entries) {

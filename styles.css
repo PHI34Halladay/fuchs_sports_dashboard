@@ -151,6 +151,9 @@ td.strong { font-weight: 700; }
 .rank-mark { display: inline-block; width: 4px; height: 18px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
 .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; font-size: 12px; color: var(--muted); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
+.standings-group.top25 { padding-bottom: 20px; margin-bottom: 28px; border-bottom: 1px solid var(--border); }
+.rank-up { color: var(--live); font-size: 12px; }
+.rank-down { color: #ffb4b6; font-size: 12px; }
 
 /* News */
 .news { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
@@ -283,6 +286,17 @@ dialog.gc::backdrop { background: rgba(0, 0, 0, .65); backdrop-filter: blur(3px)
 .gc-chip { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-size: 12px; color: var(--muted); }
 .gc-chip.active { background: var(--text); color: var(--bg); border-color: var(--text); }
 .gc-chip-sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
+
+.gc-drives { display: flex; flex-direction: column; gap: 8px; }
+.gc-drive { border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; background: var(--surface); }
+.gc-drive.score { border-color: rgba(61, 220, 132, .4); background: rgba(61, 220, 132, .06); }
+.gc-drive-head { display: grid; grid-template-columns: 24px 1fr auto; gap: 10px; align-items: center; font-size: 13px; }
+.gc-drive-head img { width: 20px; height: 20px; object-fit: contain; }
+.gc-drive-desc { color: var(--muted); }
+.gc-drive-desc b { color: var(--text); }
+.gc-drive-result { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.gc-drive-plays { margin: 8px 0 2px; padding-left: 34px; display: flex; flex-direction: column; gap: 4px; }
+.gc-drive-play { font-size: 12px; color: var(--muted); }
 .gc-rink-wrap { position: relative; }
 .gc-rink { width: 100%; height: auto; display: block; }
 .gc-rink-team { position: absolute; top: -2px; display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--text); background: rgba(13,17,23,.75); padding: 2px 6px; border-radius: 6px; margin: 6px 14%; }

@@ -12,6 +12,7 @@ const CACHE = {
   standings: 300,
   news: 300,
   teams: 86400,
+  rankings: 300,
 };
 
 const RE_SPORT = /^[a-z-]{2,30}$/;
@@ -45,6 +46,9 @@ function buildUrl(q) {
       break;
     case 'standings':
       url = `${BASE_V2}/${sport}/${league}/standings`;
+      break;
+    case 'rankings':
+      url = `${BASE_SITE}/${sport}/${league}/rankings`;
       break;
     case 'news':
       url = `${BASE_SITE}/${sport}/${league}/news`;

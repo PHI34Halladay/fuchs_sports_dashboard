@@ -83,6 +83,7 @@
   const gameState = (d) => comp(d).status?.type?.state || 'pre';
   const isNHL = () => ctx.league().league === 'nhl';
   const isMLB = () => ctx.league().league === 'mlb';
+  const isFootball = () => ctx.league().sport === 'football';
   const isSoccer = () => ctx.league().sport === 'soccer';
 
   function teamInfo(c) {
@@ -102,6 +103,7 @@
       record: (c.record || c.records || []).find((r) => r.type === 'total')?.summary || '',
       hits: c.hits ?? null,
       errors: c.errors ?? null,
+      rank: c.curatedRank?.current && c.curatedRank.current <= 25 ? c.curatedRank.current : null,
     };
   }
 
@@ -150,6 +152,12 @@
       const half = p?.type === 'Top' ? ' (oben)' : p?.type === 'Bottom' ? ' (unten)' : '';
       return p?.number ? `${p.number}. Inning${half}` : 'Inning';
     }
+    if (isFootball()) {
+      const n = p?.number;
+      if (!n) return 'Viertel';
+      if (n <= 4) return `${n}. Viertel`;
+      return n - 4 === 1 ? 'OT' : `${n - 4}. OT`;
+    }
     const v = p?.displayValue || '';
     if (/^\d/.test(v)) return `${parseInt(v, 10)}. Drittel`;
     if (v === 'OT') return 'Verlängerung';
@@ -180,9 +188,10 @@
     const t = [];
     if (st === 'pre') {
       t.push({ id: 'preview', label: 'Vorschau' });
-    } else if (isNHL() || isMLB()) {
+    } else if (isNHL() || isMLB() || isFootball()) {
       t.push({ id: 'gamecast', label: 'Gamecast' });
-      if ((d.plays || []).length) t.push({ id: 'pbp', label: 'Play-by-Play' });
+      const hasPbp = isFootball() ? (d.drives?.previous || []).length : (d.plays || []).length;
+      if (hasPbp) t.push({ id: 'pbp', label: isFootball() ? 'Drives' : 'Play-by-Play' });
       if ((d.boxscore?.players || []).length) t.push({ id: 'box', label: 'Boxscore' });
     } else {
       t.push({ id: 'overview', label: 'Übersicht' });
@@ -208,7 +217,7 @@
     const side = (t) => `
       <div class="gc-team${st.state === 'post' && t.winner === false ? ' lost' : ''}">
         ${t.logo ? `<img src="${ctx.esc(t.logo)}" alt="">` : ''}
-        <div class="gc-team-name">${ctx.esc(isSoccer() ? t.short : t.name)}</div>
+        <div class="gc-team-name">${t.rank ? `#${t.rank} ` : ''}${ctx.esc(isSoccer() ? t.short : t.name)}</div>
         <div class="gc-team-rec">${ctx.esc(t.record)}</div>
       </div>`;
 
@@ -266,9 +275,9 @@
   function renderBody() {
     const d = current.data;
     switch (current.tab) {
-      case 'gamecast': $body.innerHTML = isMLB() ? mlbGamecast(d) : nhlGamecast(d); break;
-      case 'pbp': $body.innerHTML = isMLB() ? mlbPlayByPlay(d) : nhlPlayByPlay(d); break;
-      case 'box': $body.innerHTML = isMLB() ? mlbBoxscore(d) : nhlBoxscore(d); break;
+      case 'gamecast': $body.innerHTML = isMLB() ? mlbGamecast(d) : isFootball() ? footballGamecast(d) : nhlGamecast(d); break;
+      case 'pbp': $body.innerHTML = isMLB() ? mlbPlayByPlay(d) : isFootball() ? footballDrives(d) : nhlPlayByPlay(d); break;
+      case 'box': $body.innerHTML = isMLB() ? mlbBoxscore(d) : isFootball() ? footballBoxscore(d) : nhlBoxscore(d); break;
       case 'recap': $body.innerHTML = recap(d); break;
       case 'preview': $body.innerHTML = preview(d); break;
       default: $body.innerHTML = genericOverview(d);
@@ -557,7 +566,11 @@
   const GOALIE_COLS = [
     ['shotsAgainst', 'SA'], ['goalsAgainst', 'GA'], ['saves', 'SV'], ['savePct', 'SV%'], ['timeOnIce', 'TOI'], ['penaltyMinutes', 'PIM'],
   ];
-  const GROUP_NAMES = { forwards: 'Stürmer', defenses: 'Verteidiger', skaters: 'Feldspieler', goalies: 'Torhüter', batting: 'Schlagleute', pitching: 'Pitcher' };
+  const GROUP_NAMES = {
+    forwards: 'Stürmer', defenses: 'Verteidiger', skaters: 'Feldspieler', goalies: 'Torhüter',
+    batting: 'Schlagleute', pitching: 'Pitcher',
+    passing: 'Passing', rushing: 'Rushing', receiving: 'Receiving', defensive: 'Defense', kicking: 'Kicking',
+  };
 
   function nhlBoxscore(d) {
     const { home, away } = teams(d);
@@ -589,6 +602,126 @@
           </table></div>`;
       }).join(''));
     }).join('') + '<div class="gc-note">T = Tore · A = Assists · P = Punkte · S = Schüsse · HT = Checks · BS = geblockte Schüsse · PIM = Strafminuten · FO% = Bullyquote · TOI = Eiszeit · SA = Schüsse gegen · GA = Gegentore · SV = Paraden</div>';
+  }
+
+  // ---------- American Football (NFL/NCAAF): Gamecast ----------
+  const FOOTBALL_TEAM_STATS = [
+    ['totalYards', 'Yards gesamt'],
+    ['netPassingYards', 'Passyards'],
+    ['rushingYards', 'Laufyards'],
+    ['thirdDownEff', '3rd-Down-Versuche'],
+    ['turnovers', 'Turnover'],
+    ['totalPenaltiesYards', 'Strafen'],
+    ['possessionTime', 'Ballbesitz'],
+  ];
+
+  function footballGamecast(d) {
+    return [footballScoringSummary(d), teamStatsCompare(d, FOOTBALL_TEAM_STATS), footballLeaders(d), videoHighlights(d), gameInfo(d)]
+      .filter(Boolean).join('');
+  }
+
+  function footballScoringSummary(d) {
+    const scores = d.scoringPlays || [];
+    if (!scores.length) return section('Spielstand-Verlauf', '<div class="gc-empty">Noch keine Punkte.</div>');
+    const { byId } = teams(d);
+    return section('Spielstand-Verlauf', groupByPeriod(scores).map(([per, list]) => `
+      <div class="gc-period">${ctx.esc(periodName(per))}</div>
+      ${list.map((p) => {
+        const t = byId[String(p.team?.id)];
+        return `<div class="gc-goal">
+          <div class="gc-time">${ctx.esc(p.scoringType?.abbreviation || '')}</div>
+          <div class="gc-goal-img">${t?.logo ? `<img class="gc-goal-logo" src="${ctx.esc(t.logo)}" alt="">` : ''}</div>
+          <div class="gc-goal-txt"><div>${ctx.esc((p.text || '').trim())}</div></div>
+          <div class="gc-goal-score">${ctx.esc(scoreAfter(d, p))}</div>
+        </div>`;
+      }).join('')}`).join(''));
+  }
+
+  function footballLeaders(d) {
+    const leaders = (d.leaders || []).filter((t) => (t.leaders || []).length);
+    if (!leaders.length) return '';
+    const { byId } = teams(d);
+    const wanted = ['passingYards', 'rushingYards', 'receivingYards'];
+    return section('Topspieler', `<div class="gc-leaders">${leaders.map((t) => {
+      const ti = byId[String(t.team?.id)];
+      const cats = (t.leaders || []).filter((c) => wanted.includes(c.name));
+      return `<div><div class="gc-leaders-team">${ti?.logo ? `<img src="${ctx.esc(ti.logo)}" alt="">` : ''}${ctx.esc(ti?.name || '')}</div>
+        ${cats.map((cat) => {
+          const l = cat.leaders?.[0];
+          if (!l) return '';
+          return `<div class="gc-row"><span class="muted">${ctx.esc(cat.displayName)}</span><span>${ctx.esc(l.athlete?.shortName || l.athlete?.displayName || '')}</span><span><b>${ctx.esc(l.displayValue)}</b></span></div>`;
+        }).join('')}</div>`;
+    }).join('')}</div>`);
+  }
+
+  // ---------- Football: Drives ----------
+  function footballDrives(d) {
+    const drives = d.drives?.previous || [];
+    if (!drives.length) return '<div class="gc-empty">Keine Drive-Daten.</div>';
+    const withPeriod = drives.map((dr) => ({ ...dr, _period: dr.plays?.[0]?.period?.number || 0 }));
+    const periods = [...new Set(withPeriod.map((dr) => dr._period).filter(Boolean))].sort((a, b) => a - b);
+    const labels = periodLabels(d, Math.max(0, ...periods));
+    const sel = current.period;
+
+    let list = withPeriod.filter((dr) => sel === 'all' || String(dr._period) === sel);
+    if (gameState(d) === 'in') list = list.slice().reverse();
+
+    const chips = [['all', 'Alle'], ...periods.map((n) => [String(n), labels[n - 1]])]
+      .map(([v, l]) => `<button class="gc-chip${sel === v ? ' active' : ''}" data-period="${v}">${l}</button>`).join('');
+    const filter = `
+      <button class="gc-chip${current.filter === 'key' ? ' active' : ''}" data-filter="key">Nur Drive-Ergebnis</button>
+      <button class="gc-chip${current.filter === 'all' ? ' active' : ''}" data-filter="all">Mit allen Spielzügen</button>`;
+
+    const { byId } = teams(d);
+    const rows = list.map((dr) => {
+      const t = byId[String(dr.team?.id)];
+      const plays = current.filter === 'all' ? (dr.plays || []).map((p) => `
+        <div class="gc-drive-play"><span class="muted">${ctx.esc(p.start?.downDistanceText || '')}</span> ${ctx.esc(p.text || '')}</div>`).join('') : '';
+      return `<div class="gc-drive${dr.isScore ? ' score' : ''}">
+        <div class="gc-drive-head">
+          ${t?.logo ? `<img src="${ctx.esc(t.logo)}" alt="">` : '<span></span>'}
+          <div class="gc-drive-desc"><b>${ctx.esc(t?.abbr || '')}</b> ${ctx.esc(dr.description || '')}</div>
+          <div class="gc-drive-result${dr.isScore ? ' strong' : ''}">${ctx.esc(dr.shortDisplayResult || dr.result || '')}</div>
+        </div>
+        ${plays ? `<div class="gc-drive-plays">${plays}</div>` : ''}
+      </div>`;
+    }).join('');
+
+    return `<div class="gc-chips">${chips}<span class="gc-chip-sep"></span>${filter}</div>
+      <div class="gc-drives">${rows || '<div class="gc-empty">Keine Drives in diesem Abschnitt.</div>'}</div>`;
+  }
+
+  // ---------- Football: Boxscore ----------
+  const FOOTBALL_PASSING_COLS = [['completions/passingAttempts', 'C/ATT'], ['passingYards', 'YDS'], ['yardsPerPassAttempt', 'AVG'], ['passingTouchdowns', 'TD'], ['interceptions', 'INT'], ['sacks-sackYardsLost', 'SACKS'], ['QBRating', 'RTG']];
+  const FOOTBALL_RUSHING_COLS = [['rushingAttempts', 'ATT'], ['rushingYards', 'YDS'], ['yardsPerRushAttempt', 'AVG'], ['rushingTouchdowns', 'TD'], ['longRushing', 'LONG']];
+  const FOOTBALL_RECEIVING_COLS = [['receptions', 'REC'], ['receivingYards', 'YDS'], ['yardsPerReception', 'AVG'], ['receivingTouchdowns', 'TD'], ['longReception', 'LONG']];
+  const FOOTBALL_DEFENSIVE_COLS = [['totalTackles', 'TOT'], ['soloTackles', 'SOLO'], ['sacks', 'SACK'], ['tacklesForLoss', 'TFL'], ['passesDefended', 'PD'], ['QBHits', 'QBH']];
+  const FOOTBALL_KICKING_COLS = [['fieldGoalsMade/fieldGoalAttempts', 'FG'], ['longFieldGoalMade', 'LONG'], ['extraPointsMade/extraPointAttempts', 'XP'], ['totalKickingPoints', 'PTS']];
+  const FOOTBALL_COLS = { passing: FOOTBALL_PASSING_COLS, rushing: FOOTBALL_RUSHING_COLS, receiving: FOOTBALL_RECEIVING_COLS, defensive: FOOTBALL_DEFENSIVE_COLS, kicking: FOOTBALL_KICKING_COLS };
+
+  function footballBoxscore(d) {
+    const { home, away } = teams(d);
+    const order = [away, home];
+    return order.map((t) => {
+      const team = (d.boxscore.players || []).find((p) => String(p.team?.id) === t.id);
+      if (!team) return '';
+      const groups = (team.statistics || []).filter((g) => FOOTBALL_COLS[g.name] && (g.athletes || []).length);
+      return section(`<span class="gc-sec-team">${t.logo ? `<img src="${ctx.esc(t.logo)}" alt="">` : ''}${ctx.esc(t.name)}</span>`, groups.map((g) => {
+        const cols = FOOTBALL_COLS[g.name];
+        const idx = (k) => (g.keys || []).indexOf(k);
+        const val = (a, k) => { const i = idx(k); return i >= 0 ? a.stats?.[i] ?? '' : ''; };
+        const usable = cols.filter(([k]) => idx(k) >= 0);
+        const rows = g.athletes.map((a) => `<tr>
+            <td class="gc-box-name">${ctx.esc(a.athlete?.shortName || a.athlete?.displayName || '')}</td>
+            ${usable.map(([k]) => `<td>${ctx.esc(val(a, k))}</td>`).join('')}
+          </tr>`).join('');
+        return `<div class="gc-box-group">${GROUP_NAMES[g.name] || ctx.esc(g.name)}</div>
+          <div class="table-wrap"><table class="gc-box">
+            <thead><tr><th>Spieler</th>${usable.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead>
+            <tbody>${rows}</tbody>
+          </table></div>`;
+      }).join(''));
+    }).join('') + '<div class="gc-note">C/ATT = Pässe · YDS = Yards · TD = Touchdowns · INT = Interceptions · RTG = Passer Rating · ATT = Läufe · REC = Catches · TOT = Tackles gesamt · TFL = Tackles for Loss · PD = Pässe verteidigt · QBH = QB Hits · FG = Field Goals · XP = Extra Points</div>';
   }
 
   // ---------- MLB: Gamecast ----------

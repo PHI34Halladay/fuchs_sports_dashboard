@@ -14,10 +14,12 @@ Gehostet auf Vercel, Code auf GitHub – ohne Build-Schritt, ohne Abhängigkeite
 - **Spiel-Popup (Klick auf eine Karte):**
   - *NHL:* Gamecast mit Three Stars, Torfolge (inkl. PP/SH/EN), Shot Chart nach Drittel, Teamstatistik-Vergleich, Strafen, Spielinfo · Play-by-Play (filterbar) · Boxscore (Stürmer, Verteidiger, Torhüter) · Spielbericht
   - *MLB:* Gamecast mit Pitching-Entscheidung (Gewinner/Save/Verlierer), Punktefolge nach Inning, Linescore inkl. Hits/Errors, Teamstatistik-Vergleich · Play-by-Play (filterbar, auch pitch-genau) · Boxscore (Schlagleute, Pitcher) · Spielbericht
-  - *Videos:* Highlight-Clips direkt im Popup abspielbar, wenn ESPN welche zum Spiel anbietet (NHL, MLB und weitere Ligen)
+  - *NFL/NCAAF:* Gamecast mit Spielstand-Verlauf (TD/FG-Badges), Teamstatistik-Vergleich, Topspielern (Passing/Rushing/Receiving) · Drives (Drive-Ergebnis oder mit allen Spielzügen, filterbar nach Viertel) · Boxscore (Passing, Rushing, Receiving, Defense, Kicking) · Spielbericht; bei NCAAF Ranking-Badge (#Rang) neben Top-25-Teams
+  - *Videos:* Highlight-Clips direkt im Popup abspielbar, wenn ESPN welche zum Spiel anbietet (NHL, MLB, NFL/NCAAF und weitere Ligen)
   - *Vor Spielbeginn (alle Ligen):* Vorschau mit Saisonduell, Form, voraussichtlichen Torhütern/Pitchern, Topspielern, Ausfällen
   - *Andere Ligen:* allgemeine Übersicht (Linescore, Teamstatistik, Videos, Spielbericht) – eigene Ansichten folgen
   - Laufende Spiele aktualisieren sich im Popup alle 30 s
+- **Tabellen bei NCAAF/NCAAM:** AP Top 25 wird oben in der Tabellenansicht eingeblendet (Rang, Bilanz, Punkte, Trend)
 - Versionsnummer unten auf der Seite
 
 ## Aufbau
@@ -46,6 +48,7 @@ Verwendete ESPN-Endpunkte:
 | standings | `site.api.espn.com/apis/v2/sports/{sport}/{league}/standings` |
 | news | `site.api.espn.com/apis/site/v2/sports/{sport}/{league}/news` |
 | summary | `site.api.espn.com/apis/site/v2/sports/{sport}/{league}/summary?event={id}` |
+| rankings | `site.api.espn.com/apis/site/v2/sports/{sport}/{league}/rankings` (AP Top 25 für NCAAF/NCAAM) |
 
 ## Deployment
 
