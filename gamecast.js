@@ -82,6 +82,7 @@
   const comp = (d) => d?.header?.competitions?.[0] || {};
   const gameState = (d) => comp(d).status?.type?.state || 'pre';
   const isNHL = () => ctx.league().league === 'nhl';
+  const isMLB = () => ctx.league().league === 'mlb';
   const isSoccer = () => ctx.league().sport === 'soccer';
 
   function teamInfo(c) {
@@ -99,6 +100,8 @@
       homeAway: c.homeAway,
       linescores: (c.linescores || []).map((l) => l.displayValue ?? l.value ?? ''),
       record: (c.record || c.records || []).find((r) => r.type === 'total')?.summary || '',
+      hits: c.hits ?? null,
+      errors: c.errors ?? null,
     };
   }
 
@@ -133,16 +136,20 @@
   function periodLabels(d, count) {
     const fromPlays = {};
     (d.plays || []).forEach((p) => { if (p.period?.number) fromPlays[p.period.number] = p.period.displayValue; });
-    const reg = d.format?.regulation?.periods || (isNHL() ? 3 : isSoccer() ? 2 : 4);
+    const reg = d.format?.regulation?.periods || (isNHL() ? 3 : isSoccer() ? 2 : isMLB() ? 9 : 4);
     return Array.from({ length: count }, (_, i) => {
       const n = i + 1;
-      if (n <= reg) return String(n);
+      if (n <= reg || isMLB()) return String(n);
       const pl = fromPlays[n];
       if (pl && !/^\d/.test(pl)) return pl.toUpperCase();
       return n - reg === 1 ? 'OT' : `${n - reg}OT`;
     });
   }
   function periodName(p) {
+    if (isMLB()) {
+      const half = p?.type === 'Top' ? ' (oben)' : p?.type === 'Bottom' ? ' (unten)' : '';
+      return p?.number ? `${p.number}. Inning${half}` : 'Inning';
+    }
     const v = p?.displayValue || '';
     if (/^\d/.test(v)) return `${parseInt(v, 10)}. Drittel`;
     if (v === 'OT') return 'Verlängerung';
@@ -173,7 +180,7 @@
     const t = [];
     if (st === 'pre') {
       t.push({ id: 'preview', label: 'Vorschau' });
-    } else if (isNHL()) {
+    } else if (isNHL() || isMLB()) {
       t.push({ id: 'gamecast', label: 'Gamecast' });
       if ((d.plays || []).length) t.push({ id: 'pbp', label: 'Play-by-Play' });
       if ((d.boxscore?.players || []).length) t.push({ id: 'box', label: 'Boxscore' });
@@ -238,10 +245,11 @@
       ).join('');
     }
 
-    const row = (t) => `<tr><td>${ctx.esc(t.abbr)}</td>${Array.from({ length: n }, (_, i) => `<td>${ctx.esc(t.linescores[i] ?? '')}</td>`).join('')}<td class="gc-ls-total">${ctx.esc(t.score)}</td></tr>`;
+    const mlbExtra = isMLB();
+    const row = (t) => `<tr><td>${ctx.esc(t.abbr)}</td>${Array.from({ length: n }, (_, i) => `<td>${ctx.esc(t.linescores[i] ?? '')}</td>`).join('')}<td class="gc-ls-total">${ctx.esc(t.score)}</td>${mlbExtra ? `<td>${ctx.esc(t.hits ?? '')}</td><td>${ctx.esc(t.errors ?? '')}</td>` : ''}</tr>`;
     return `
       <div class="gc-ls-wrap"><table class="gc-ls">
-        <thead><tr><th></th>${labels.map((l) => `<th>${l}</th>`).join('')}<th>T</th></tr></thead>
+        <thead><tr><th></th>${labels.map((l) => `<th>${l}</th>`).join('')}<th>${mlbExtra ? 'R' : 'T'}</th>${mlbExtra ? '<th>H</th><th>E</th>' : ''}</tr></thead>
         <tbody>${row(left)}${row(right)}${shotsRow}</tbody>
       </table></div>`;
   }
@@ -258,9 +266,9 @@
   function renderBody() {
     const d = current.data;
     switch (current.tab) {
-      case 'gamecast': $body.innerHTML = nhlGamecast(d); break;
-      case 'pbp': $body.innerHTML = nhlPlayByPlay(d); break;
-      case 'box': $body.innerHTML = nhlBoxscore(d); break;
+      case 'gamecast': $body.innerHTML = isMLB() ? mlbGamecast(d) : nhlGamecast(d); break;
+      case 'pbp': $body.innerHTML = isMLB() ? mlbPlayByPlay(d) : nhlPlayByPlay(d); break;
+      case 'box': $body.innerHTML = isMLB() ? mlbBoxscore(d) : nhlBoxscore(d); break;
       case 'recap': $body.innerHTML = recap(d); break;
       case 'preview': $body.innerHTML = preview(d); break;
       default: $body.innerHTML = genericOverview(d);
@@ -272,7 +280,7 @@
 
   // ---------- NHL: Gamecast ----------
   function nhlGamecast(d) {
-    return [stars(d), scoringSummary(d), shotChart(d), teamStatsCompare(d, NHL_TEAM_STATS), penaltySummary(d), gameInfo(d)]
+    return [stars(d), scoringSummary(d), shotChart(d), teamStatsCompare(d, NHL_TEAM_STATS), penaltySummary(d), videoHighlights(d), gameInfo(d)]
       .filter(Boolean).join('');
   }
 
@@ -305,6 +313,10 @@
         const v = (k) => (idx(k) >= 0 ? s[idx(k)] : null);
         if (g.name === 'goalies') {
           out[a.athlete?.id] = `${v('saves') ?? '–'} Saves · ${v('savePct') ?? ''} SV%`;
+        } else if (g.name === 'pitching') {
+          out[a.athlete?.id] = `${v('fullInnings.partInnings') ?? '–'} IP · ${v('strikeouts') ?? 0} K · ${v('earnedRuns') ?? 0} ER`;
+        } else if (g.name === 'batting') {
+          out[a.athlete?.id] = `${v('hits-atBats') ?? ''} · ${v('RBIs') ?? 0} RBI${+v('homeRuns') > 0 ? ` · ${v('homeRuns')} HR` : ''}`;
         } else {
           const gl = +v('goals') || 0, as = +v('assists') || 0;
           out[a.athlete?.id] = `${gl} T · ${as} A · ${v('shotsTotal') ?? 0} S`;
@@ -545,7 +557,7 @@
   const GOALIE_COLS = [
     ['shotsAgainst', 'SA'], ['goalsAgainst', 'GA'], ['saves', 'SV'], ['savePct', 'SV%'], ['timeOnIce', 'TOI'], ['penaltyMinutes', 'PIM'],
   ];
-  const GROUP_NAMES = { forwards: 'Stürmer', defenses: 'Verteidiger', skaters: 'Feldspieler', goalies: 'Torhüter' };
+  const GROUP_NAMES = { forwards: 'Stürmer', defenses: 'Verteidiger', skaters: 'Feldspieler', goalies: 'Torhüter', batting: 'Schlagleute', pitching: 'Pitcher' };
 
   function nhlBoxscore(d) {
     const { home, away } = teams(d);
@@ -577,6 +589,173 @@
           </table></div>`;
       }).join(''));
     }).join('') + '<div class="gc-note">T = Tore · A = Assists · P = Punkte · S = Schüsse · HT = Checks · BS = geblockte Schüsse · PIM = Strafminuten · FO% = Bullyquote · TOI = Eiszeit · SA = Schüsse gegen · GA = Gegentore · SV = Paraden</div>';
+  }
+
+  // ---------- MLB: Gamecast ----------
+  function mlbGamecast(d) {
+    return [decisions(d), mlbScoringSummary(d), mlbTeamStatsCompare(d), videoHighlights(d), gameInfo(d)]
+      .filter(Boolean).join('');
+  }
+
+  function decisions(d) {
+    const fa = comp(d).status?.featuredAthletes || [];
+    const order = [['winningPitcher', 'Gewinner'], ['savingPitcher', 'Save'], ['losingPitcher', 'Verlierer']];
+    const list = order.map(([key, label]) => ({ key, label, f: fa.find((x) => x.name === key) })).filter((x) => x.f?.athlete);
+    if (!list.length) return '';
+    const { byId } = teams(d);
+    const line = playerLines(d);
+    return section('Pitching-Entscheidung', `<div class="gc-stars">${list.map(({ key, label, f }) => {
+      const a = f.athlete;
+      const t = byId[String(f.team?.id)];
+      const rec = a.record ? `${a.record}${key === 'savingPitcher' && +a.saves > 0 ? `, ${a.saves} SV` : ''}` : '';
+      return `<div class="gc-star">
+        <div class="gc-star-img">${a.headshot?.href ? `<img src="${ctx.esc(a.headshot.href)}" alt="" loading="lazy">` : ''}${t?.logo ? `<img class="gc-star-logo" src="${ctx.esc(t.logo)}" alt="">` : ''}</div>
+        <div class="gc-star-label">${label}</div>
+        <div class="gc-star-name">${ctx.esc(a.displayName)}</div>
+        <div class="gc-star-line">${[rec, line[a.id]].filter(Boolean).join(' · ')}</div>
+      </div>`;
+    }).join('')}</div>`);
+  }
+
+  function mlbScoringSummary(d) {
+    const scoring = (d.plays || []).filter((p) => p.scoringPlay);
+    if (!scoring.length) return section('Punkte', '<div class="gc-empty">Noch keine Punkte.</div>');
+    const { byId } = teams(d);
+    return section('Punkte', groupByPeriod(scoring).map(([per, list]) => `
+      <div class="gc-period">${ctx.esc(periodName(per))}</div>
+      ${list.map((p) => {
+        const t = byId[String(p.team?.id)];
+        const isHR = p.alternativeType?.type === 'home-run';
+        return `<div class="gc-goal">
+          <div class="gc-time">${p.period?.type === 'Top' ? '▲' : '▼'}</div>
+          <div class="gc-goal-img">${t?.logo ? `<img class="gc-goal-logo" src="${ctx.esc(t.logo)}" alt="">` : ''}</div>
+          <div class="gc-goal-txt">
+            <div>${ctx.esc(p.text || '')} ${isHR ? '<span class="gc-badge pp">HR</span>' : ''}</div>
+          </div>
+          <div class="gc-goal-score">${ctx.esc(scoreAfter(d, p))}</div>
+        </div>`;
+      }).join('')}`).join(''));
+  }
+
+  const MLB_TEAM_STATS = [
+    ['batting', 'hits', 'Hits'],
+    ['batting', 'homeRuns', 'Home Runs'],
+    ['batting', 'walks', 'Walks'],
+    ['pitching', 'strikeouts', 'Strikeouts (Pitcher)'],
+    ['pitching', 'walks', 'Walks (Pitcher)'],
+    ['pitching', 'earnedRuns', 'Earned Runs'],
+    ['fielding', 'errors', 'Fehler'],
+  ];
+
+  function mlbTeamStatsCompare(d) {
+    const { home, away } = teams(d);
+    const L = boxTeam(d, away.id)?.statistics, R = boxTeam(d, home.id)?.statistics;
+    if (!L || !R) return '';
+    const find = (groups, group, name) => groups.find((g) => g.name === group)?.stats?.find((s) => s.name === name);
+    const rows = MLB_TEAM_STATS.map(([group, key, label]) => {
+      const a = find(L, group, key), b = find(R, group, key);
+      if (!a || !b) return '';
+      const ln = parseFloat(a.displayValue) || 0, rn = parseFloat(b.displayValue) || 0;
+      const sum = ln + rn;
+      const lp = sum ? (ln / sum) * 100 : 50;
+      return `<div class="gc-cmp">
+        <div class="gc-cmp-top"><span>${ctx.esc(a.displayValue)}</span><span class="muted">${ctx.esc(label)}</span><span>${ctx.esc(b.displayValue)}</span></div>
+        <div class="gc-cmp-bar"><i style="width:${lp}%;background:${away.color}"></i><i style="width:${100 - lp}%;background:${home.color}"></i></div>
+      </div>`;
+    }).join('');
+    return section('Teamstatistik', `<div class="gc-cmp-head"><span>${ctx.esc(away.abbr)}</span><span>${ctx.esc(home.abbr)}</span></div>${rows}`);
+  }
+
+  // ---------- MLB: Play-by-Play ----------
+  function mlbPlayByPlay(d) {
+    const { byId } = teams(d);
+    const all = d.plays || [];
+    const periods = [...new Set(all.map((p) => p.period?.number).filter(Boolean))].sort((a, b) => a - b);
+    const labels = periodLabels(d, Math.max(0, ...periods));
+    const sel = current.period;
+
+    let list = all.filter((p) => sel === 'all' || String(p.period?.number) === sel);
+    if (current.filter === 'key') list = list.filter((p) => p.type?.type === 'play-result');
+    if (gameState(d) === 'in') list = list.slice().reverse();
+
+    const chips = [['all', 'Alle'], ...periods.map((n) => [String(n), labels[n - 1]])]
+      .map(([v, l]) => `<button class="gc-chip${sel === v ? ' active' : ''}" data-period="${v}">${l}</button>`).join('');
+    const filter = `
+      <button class="gc-chip${current.filter === 'key' ? ' active' : ''}" data-filter="key">Wichtige</button>
+      <button class="gc-chip${current.filter === 'all' ? ' active' : ''}" data-filter="all">Alle Aktionen (jeder Pitch)</button>`;
+
+    let lastPeriod = null;
+    const rows = list.map((p) => {
+      let head = '';
+      if (sel === 'all' && p.period?.number !== lastPeriod) {
+        lastPeriod = p.period?.number;
+        head = `<div class="gc-period">${ctx.esc(periodName(p.period))}</div>`;
+      }
+      const t = byId[String(p.team?.id)];
+      const cls = p.scoringPlay ? ' goal' : '';
+      return `${head}<div class="gc-play${cls}">
+        <div class="gc-time">${p.period?.type === 'Top' ? '▲' : p.period?.type === 'Bottom' ? '▼' : ''}</div>
+        ${t?.logo ? `<img src="${ctx.esc(t.logo)}" alt="">` : '<span></span>'}
+        <div>${p.scoringPlay ? '<b>PUNKT</b> ' : ''}${ctx.esc(p.text || p.type?.text || '')}</div>
+        <div class="gc-play-score">${p.scoringPlay ? ctx.esc(`${p.awayScore}–${p.homeScore}`) : ''}</div>
+      </div>`;
+    }).join('');
+
+    return `<div class="gc-chips">${chips}<span class="gc-chip-sep"></span>${filter}</div>
+      <div class="gc-plays">${rows || '<div class="gc-empty">Keine Aktionen.</div>'}</div>`;
+  }
+
+  // ---------- MLB: Boxscore ----------
+  const MLB_BATTING_COLS = [
+    ['hits-atBats', 'H-AB'], ['runs', 'R'], ['RBIs', 'RBI'], ['homeRuns', 'HR'], ['walks', 'BB'], ['strikeouts', 'SO'], ['avg', 'AVG'],
+  ];
+  const MLB_PITCHING_COLS = [
+    ['fullInnings.partInnings', 'IP'], ['hits', 'H'], ['runs', 'R'], ['earnedRuns', 'ER'], ['walks', 'BB'], ['strikeouts', 'K'], ['homeRuns', 'HR'], ['ERA', 'ERA'],
+  ];
+
+  function mlbBoxscore(d) {
+    const { home, away } = teams(d);
+    const order = [away, home];
+    return order.map((t) => {
+      const team = (d.boxscore.players || []).find((p) => String(p.team?.id) === t.id);
+      if (!team) return '';
+      const groups = (team.statistics || []).filter((g) => (g.athletes || []).length);
+      return section(`<span class="gc-sec-team">${t.logo ? `<img src="${ctx.esc(t.logo)}" alt="">` : ''}${ctx.esc(t.name)}</span>`, groups.map((g) => {
+        const cols = g.name === 'pitching' ? MLB_PITCHING_COLS : MLB_BATTING_COLS;
+        const idx = (k) => (g.keys || []).indexOf(k);
+        const val = (a, k) => { const i = idx(k); return i >= 0 ? a.stats?.[i] ?? '' : ''; };
+        const usable = cols.filter(([k]) => idx(k) >= 0);
+        const rows = g.athletes.map((a) => `<tr>
+            <td class="gc-box-name"><span class="muted">${ctx.esc(a.athlete?.position?.abbreviation || '')}</span> ${ctx.esc(a.athlete?.shortName || a.athlete?.displayName || '')}</td>
+            ${usable.map(([k]) => `<td>${ctx.esc(val(a, k))}</td>`).join('')}
+          </tr>`).join('');
+        return `<div class="gc-box-group">${GROUP_NAMES[g.name] || ctx.esc(g.name)}</div>
+          <div class="table-wrap"><table class="gc-box">
+            <thead><tr><th>Spieler</th>${usable.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead>
+            <tbody>${rows}</tbody>
+          </table></div>`;
+      }).join(''));
+    }).join('') + '<div class="gc-note">H-AB = Hits-At Bats · R = Runs · RBI = Runs Batted In · HR = Home Runs · BB = Walks · SO = Strikeouts · AVG = Batting Average · IP = Innings Pitched · ER = Earned Runs · K = Strikeouts · ERA = Earned Run Average</div>';
+  }
+
+  // ---------- Videos (alle Sportarten) ----------
+  function videoHighlights(d) {
+    const vids = (d.videos || []).filter((v) => v.headline).slice(0, 6);
+    if (!vids.length) return '';
+    return section('Videos', `<div class="gc-videos">${vids.map((v) => {
+      const mp4 = v.links?.source?.href || v.links?.source?.HD?.href || '';
+      const web = v.links?.web?.href || '';
+      const dur = v.duration ? `${Math.floor(v.duration / 60)}:${String(v.duration % 60).padStart(2, '0')}` : '';
+      return `<div class="gc-video">
+        <div class="gc-video-frame"${mp4 ? ` data-video-src="${ctx.esc(mp4)}"` : ''}>
+          ${v.thumbnail ? `<img src="${ctx.esc(v.thumbnail)}" alt="" loading="lazy">` : ''}
+          ${mp4 ? '<span class="gc-video-play">▶</span>' : ''}
+          ${dur ? `<span class="gc-video-dur">${dur}</span>` : ''}
+        </div>
+        <div class="gc-video-title">${ctx.esc(v.headline)}</div>
+        ${!mp4 && web ? `<a class="gc-video-link" href="${ctx.esc(web)}" target="_blank" rel="noopener">Auf ESPN ansehen ↗</a>` : ''}
+      </div>`;
+    }).join('')}</div>`);
   }
 
   // ---------- Bericht (alle Sportarten) ----------
@@ -674,8 +853,9 @@
       return `<div class="gc-row gc-row-3"><span>${ctx.esc(s.displayValue)}</span><span class="muted">${ctx.esc(s.label || s.name)}</span><span>${ctx.esc(o?.displayValue ?? '')}</span></div>`;
     }).join('');
     const stats = rows ? section('Teamstatistik', `<div class="gc-cmp-head"><span>${ctx.esc(lt.abbr)}</span><span>${ctx.esc(rt.abbr)}</span></div>${rows}`) : '';
+    const videos = videoHighlights(d);
     const info = gameInfo(d);
-    return (stats + info) || '<div class="gc-empty">Ausführliche Ansicht für diese Liga folgt.</div>';
+    return (stats + videos + info) || '<div class="gc-empty">Ausführliche Ansicht für diese Liga folgt.</div>';
   }
 
   // ---------- Bausteine ----------
@@ -691,7 +871,12 @@
     const per = e.target.closest('[data-period]');
     if (per) { current.period = per.dataset.period; render(true); return; }
     const f = e.target.closest('[data-filter]');
-    if (f) { current.filter = f.dataset.filter; render(true); }
+    if (f) { current.filter = f.dataset.filter; render(true); return; }
+    const vf = e.target.closest('.gc-video-frame[data-video-src]');
+    if (vf) {
+      const src = vf.dataset.videoSrc;
+      vf.outerHTML = `<div class="gc-video-frame gc-video-playing"><video controls autoplay playsinline src="${ctx.esc(src)}"></video></div>`;
+    }
   });
 
   window.Gamecast = {

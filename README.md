@@ -13,8 +13,10 @@ Gehostet auf Vercel, Code auf GitHub – ohne Build-Schritt, ohne Abhängigkeite
 - **News:** aktuelle Artikel und Videos je Liga
 - **Spiel-Popup (Klick auf eine Karte):**
   - *NHL:* Gamecast mit Three Stars, Torfolge (inkl. PP/SH/EN), Shot Chart nach Drittel, Teamstatistik-Vergleich, Strafen, Spielinfo · Play-by-Play (filterbar) · Boxscore (Stürmer, Verteidiger, Torhüter) · Spielbericht
-  - *Vor Spielbeginn (alle Ligen):* Vorschau mit Saisonduell, Form, voraussichtlichen Torhütern, Topspielern, Ausfällen
-  - *Andere Ligen:* allgemeine Übersicht (Linescore, Teamstatistik, Spielbericht) – eigene Ansichten folgen
+  - *MLB:* Gamecast mit Pitching-Entscheidung (Gewinner/Save/Verlierer), Punktefolge nach Inning, Linescore inkl. Hits/Errors, Teamstatistik-Vergleich · Play-by-Play (filterbar, auch pitch-genau) · Boxscore (Schlagleute, Pitcher) · Spielbericht
+  - *Videos:* Highlight-Clips direkt im Popup abspielbar, wenn ESPN welche zum Spiel anbietet (NHL, MLB und weitere Ligen)
+  - *Vor Spielbeginn (alle Ligen):* Vorschau mit Saisonduell, Form, voraussichtlichen Torhütern/Pitchern, Topspielern, Ausfällen
+  - *Andere Ligen:* allgemeine Übersicht (Linescore, Teamstatistik, Videos, Spielbericht) – eigene Ansichten folgen
   - Laufende Spiele aktualisieren sich im Popup alle 30 s
 - Versionsnummer unten auf der Seite
 
