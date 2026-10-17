@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '1.4.0';
+  const VERSION = '1.4.1';
 
   // ---------- Konfiguration ----------
   // Weitere Ligen einfach hier ergänzen (sport/league = ESPN-Pfad).
