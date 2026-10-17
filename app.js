@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '1.6.0';
+  const VERSION = '1.6.1';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -24,6 +24,9 @@
     { id: 'ligue1', name: 'Ligue 1', sport: 'soccer', league: 'fra.1' },
     { id: 'seriea', name: 'Serie A', sport: 'soccer', league: 'ita.1' },
     { id: 'mls', name: 'MLS', sport: 'soccer', league: 'usa.1' },
+    { id: 'ucl', name: 'Champions League', sport: 'soccer', league: 'uefa.champions' },
+    { id: 'uel', name: 'Europa League', sport: 'soccer', league: 'uefa.europa' },
+    { id: 'uecl', name: 'Conference League', sport: 'soccer', league: 'uefa.europa.conf' },
   ];
 
   // US-Ligen: Spieltag richtet sich nach US-Eastern-Zeit, nicht nach deutscher
@@ -45,6 +48,7 @@
     tab: initialLeagueId === FAV_ID ? 'scores' : (['scores', 'standings', 'news'].includes(saved.tab) ? saved.tab : 'scores'),
     date: todayAnchor(),
     top25Only: !!saved.top25Only,
+    standingsConf: null, // Tabellen-Ansicht bei NCAAF/NCAAM: 'top25' oder ein Conference-Name
   };
   let favorites = new Set(readJSON(LS_FAV, []));
   let refreshTimer = null;
@@ -251,10 +255,9 @@
       b.setAttribute('aria-selected', active);
     });
     el.scoreControls.style.display = state.tab === 'scores' ? '' : 'none';
-    // Bei College-Ligen steht an der Stelle der größeren Datumsanzeige der
-    // Top-25-Filter; sonst bekommt das Datum den freigewordenen Platz.
+    // Top-25-Filter nur bei den College-Ligen (NCAAF/NCAAM); die Datumsanzeige
+    // bleibt dabei bei allen Sportarten gleich groß.
     el.top25Toggle.hidden = !isCollege || isFavView;
-    el.dateText.closest('.date-label').classList.toggle('lg', !isCollege && !isFavView);
   }
   function renderDate() {
     el.dateText.textContent = fmtShort.format(state.date);
@@ -461,6 +464,7 @@
   };
 
   const RANKED_LEAGUES = new Set(['cfb', 'cbb']);
+  let lastStandings = null; // { data, rankings } – für Neurendern bei Conference-Wechsel ohne Reload
 
   async function loadStandings() {
     const id = ++requestId;
@@ -473,6 +477,7 @@
         wantsRankings ? api('rankings').catch(() => null) : Promise.resolve(null),
       ]);
       if (id !== requestId) return;
+      lastStandings = { data, rankings };
       renderStandings(data, rankings);
       setUpdated();
     } catch (e) {
@@ -520,9 +525,56 @@
   const stat = (entry, name) => entry.stats?.find((s) => s.name === name);
   const statVal = (entry, name) => stat(entry, name)?.value;
 
+  function groupHtml(g, showTitle, sport, baseCols) {
+    const entries = sortEntries(g.entries);
+    const sample = entries[0];
+    // Nur Spalten zeigen, die es gibt (und "T" nur, wenn es Unentschieden gibt)
+    const cols = baseCols.filter(([key]) => {
+      if (key === '__goals') return stat(sample, 'pointsFor') && stat(sample, 'pointsAgainst');
+      if (!stat(sample, key)) return false;
+      if (key === 'ties' && sport !== 'soccer') return entries.some((e) => statVal(e, 'ties') > 0);
+      return true;
+    });
+
+    const notes = new Map();
+    const rows = entries.map((e, i) => {
+      const t = e.team || {};
+      const logo = t.logos?.[0]?.href;
+      const mark = e.note?.color ? `<span class="rank-mark" style="background:${esc(e.note.color)}"></span>` : '';
+      if (e.note?.color && e.note.description) notes.set(e.note.color, e.note.description);
+      const cells = cols.map(([key, , strong]) => {
+        let v;
+        if (key === '__goals') v = `${stat(e, 'pointsFor').displayValue}:${stat(e, 'pointsAgainst').displayValue}`;
+        else v = stat(e, key)?.displayValue ?? '';
+        return `<td class="${strong ? 'strong' : ''}">${esc(v)}</td>`;
+      }).join('');
+      return `<tr class="${isFav(t.id) ? 'fav' : ''}">
+        <td>${mark}${i + 1}</td>
+        <td class="team-cell gc-link" data-team-id="${esc(t.id)}">${logo ? window.LogoPref.img(t.id, logo) : ''}<span>${esc(sport === 'soccer' ? t.shortDisplayName || t.displayName : t.displayName)}</span></td>
+        ${cells}
+      </tr>`;
+    }).join('');
+
+    const legend = notes.size
+      ? `<div class="legend">${[...notes].map(([c, d]) => `<span><span class="rank-mark" style="background:${esc(c)}"></span>${esc(d)}</span>`).join('')}</div>`
+      : '';
+
+    return `
+      <div class="standings-group">
+        ${showTitle ? `<h2 class="group-title">${esc(g.name)}</h2>` : ''}
+        <div class="table-wrap"><table>
+          <thead><tr><th>#</th><th>Team</th>${cols.map(([, label]) => `<th>${esc(label)}</th>`).join('')}</tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>
+        ${legend}
+      </div>`;
+  }
+
   function renderStandings(data, rankings) {
     const groups = collectGroups(data);
     const top25 = rankings ? top25Html(rankings) : '';
+    const isCollege = COLLEGE_IDS.has(state.leagueId);
+
     if (!groups.length) {
       el.content.innerHTML = top25 || '<div class="empty">Für diese Liga ist aktuell keine Tabelle verfügbar.</div>';
       return;
@@ -530,51 +582,24 @@
     const sport = currentLeague().sport;
     const baseCols = COLUMNS[sport] || COLUMNS.default;
 
-    const html = groups.map((g) => {
-      const entries = sortEntries(g.entries);
-      const sample = entries[0];
-      // Nur Spalten zeigen, die es gibt (und "T" nur, wenn es Unentschieden gibt)
-      const cols = baseCols.filter(([key]) => {
-        if (key === '__goals') return stat(sample, 'pointsFor') && stat(sample, 'pointsAgainst');
-        if (!stat(sample, key)) return false;
-        if (key === 'ties' && sport !== 'soccer') return entries.some((e) => statVal(e, 'ties') > 0);
-        return true;
-      });
+    // Bei NCAAF/NCAAM gibt es zu viele Conferences, um sie alle gleichzeitig zu
+    // zeigen: stattdessen per Dropdown eine auswählen (vorbelegt mit "Top 25").
+    if (isCollege) {
+      const hasTop25 = !!top25;
+      const valid = (v) => v === 'top25' ? hasTop25 : groups.some((g) => g.name === v);
+      const selected = valid(state.standingsConf) ? state.standingsConf : (hasTop25 ? 'top25' : groups[0]?.name);
+      state.standingsConf = selected;
+      const options = [
+        hasTop25 ? `<option value="top25"${selected === 'top25' ? ' selected' : ''}>Top 25</option>` : '',
+        ...groups.map((g) => `<option value="${esc(g.name)}"${selected === g.name ? ' selected' : ''}>${esc(g.name)}</option>`),
+      ].join('');
+      const picker = `<div class="conf-picker"><select id="confSelect" aria-label="Conference wählen">${options}</select></div>`;
+      const body = selected === 'top25' ? top25 : groupHtml(groups.find((g) => g.name === selected), true, sport, baseCols);
+      el.content.innerHTML = picker + body;
+      return;
+    }
 
-      const notes = new Map();
-      const rows = entries.map((e, i) => {
-        const t = e.team || {};
-        const logo = t.logos?.[0]?.href;
-        const mark = e.note?.color ? `<span class="rank-mark" style="background:${esc(e.note.color)}"></span>` : '';
-        if (e.note?.color && e.note.description) notes.set(e.note.color, e.note.description);
-        const cells = cols.map(([key, , strong]) => {
-          let v;
-          if (key === '__goals') v = `${stat(e, 'pointsFor').displayValue}:${stat(e, 'pointsAgainst').displayValue}`;
-          else v = stat(e, key)?.displayValue ?? '';
-          return `<td class="${strong ? 'strong' : ''}">${esc(v)}</td>`;
-        }).join('');
-        return `<tr class="${isFav(t.id) ? 'fav' : ''}">
-          <td>${mark}${i + 1}</td>
-          <td class="team-cell gc-link" data-team-id="${esc(t.id)}">${logo ? window.LogoPref.img(t.id, logo) : ''}<span>${esc(sport === 'soccer' ? t.shortDisplayName || t.displayName : t.displayName)}</span></td>
-          ${cells}
-        </tr>`;
-      }).join('');
-
-      const legend = notes.size
-        ? `<div class="legend">${[...notes].map(([c, d]) => `<span><span class="rank-mark" style="background:${esc(c)}"></span>${esc(d)}</span>`).join('')}</div>`
-        : '';
-
-      return `
-        <div class="standings-group">
-          ${groups.length > 1 ? `<h2 class="group-title">${esc(g.name)}</h2>` : ''}
-          <div class="table-wrap"><table>
-            <thead><tr><th>#</th><th>Team</th>${cols.map(([, label]) => `<th>${esc(label)}</th>`).join('')}</tr></thead>
-            <tbody>${rows}</tbody>
-          </table></div>
-          ${legend}
-        </div>`;
-    }).join('');
-
+    const html = groups.map((g) => groupHtml(g, groups.length > 1, sport, baseCols)).join('');
     el.content.innerHTML = top25 + html;
   }
 
@@ -687,6 +712,7 @@
     if (btn.dataset.league === state.leagueId) return;
     state.leagueId = btn.dataset.league;
     state.date = todayAnchor();
+    state.standingsConf = null;
     if (state.leagueId === FAV_ID) state.tab = 'scores';
     persist();
     renderLeagueButtons();
@@ -747,6 +773,13 @@
     if (e.target.closest('a')) return; // ESPN-Link normal öffnen
     const card = e.target.closest('.game[data-event]');
     if (card) openGame(card);
+  });
+  el.content.addEventListener('change', (e) => {
+    const sel = e.target.closest('#confSelect');
+    if (sel && lastStandings) {
+      state.standingsConf = sel.value;
+      renderStandings(lastStandings.data, lastStandings.rankings);
+    }
   });
   el.content.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' && e.key !== ' ') return;

@@ -5,16 +5,16 @@ Gehostet auf Vercel, Code auf GitHub – ohne Build-Schritt, ohne Abhängigkeite
 
 ## Funktionen
 
-- **Ligen:** NFL, NBA, MLB, NHL, NCAAF, NCAAM, Bundesliga, 2. Bundesliga, Premier League, La Liga, Ligue 1, Serie A, MLS
-  (die sieben Fußball-Ligen sind in der Navigation unter einem „⚽ Fußball“-Dropdown zusammengefasst, damit die Leiste übersichtlich bleibt)
+- **Ligen:** NFL, NBA, MLB, NHL, NCAAF, NCAAM, Bundesliga, 2. Bundesliga, Premier League, La Liga, Ligue 1, Serie A, MLS, Champions League, Europa League, Conference League
+  (die zehn Fußball-Wettbewerbe sind in der Navigation unter einem „⚽ Fußball“-Dropdown zusammengefasst, damit die Leiste übersichtlich bleibt)
 - **★ Favoriten-Liga:** ganz vorne in der Liga-Leiste; zeigt die Spiele aller favorisierten Teams aus allen Ligen gemeinsam an einem Tag (nur Spiele-Ansicht, da ligaübergreifend – Tabelle/News ergeben hier keinen Sinn)
 - **Spiele:** Live-Stände (Auto-Refresh alle 30 s bei laufenden Spielen), Anstoßzeiten in Ortszeit, Bilanz, Top-Performer, TV-Sender, Link zum ESPN-Gamecast
-- **Datumsnavigation:** Tag vor/zurück oder Datum wählen; es wird immer ein konkretes Datum angezeigt, standardmäßig der heutige Tag. Bei den US-Ligen (NFL, NBA, MLB, NHL, NCAAF, NCAAM) wird der Spieltag anhand der US-Ostküstenzeit (Eastern Time) bestimmt statt der deutschen Kalendertage, damit ein Spiel in der Nacht von Samstag auf Sonntag (deutscher Zeit) weiterhin korrekt als Samstagsspiel geführt wird. Tag-vor/-zurück überspringt automatisch spielfreie Tage der jeweiligen Liga (z. B. bei der NFL direkt von Spieltag zu Spieltag statt Tag für Tag durch die Woche); beim Wechsel auf eine andere Liga springt das Datum direkt auf den heutigen oder, falls heute kein Spiel stattfindet, den nächsten Spieltag dieser Liga. Die Datumsanzeige ist bei allen Ligen außer NCAAF/NCAAM groß dargestellt
-- **Top 25 (NCAAF/NCAAM):** An der Stelle der größeren Datumsanzeige zeigen die College-Ligen stattdessen einen „Top 25”-Schalter; aktiviert, filtert er die Spiele-Liste auf Partien mit mindestens einem Team aus den aktuellen AP Top 25 (anhand von ESPNs `curatedRank`, ohne zusätzlichen API-Aufruf)
+- **Datumsnavigation:** Tag vor/zurück oder Datum wählen; es wird immer ein konkretes Datum angezeigt, standardmäßig der heutige Tag. Bei den US-Ligen (NFL, NBA, MLB, NHL, NCAAF, NCAAM) wird der Spieltag anhand der US-Ostküstenzeit (Eastern Time) bestimmt statt der deutschen Kalendertage, damit ein Spiel in der Nacht von Samstag auf Sonntag (deutscher Zeit) weiterhin korrekt als Samstagsspiel geführt wird. Tag-vor/-zurück überspringt automatisch spielfreie Tage der jeweiligen Liga (z. B. bei der NFL direkt von Spieltag zu Spieltag statt Tag für Tag durch die Woche); beim Wechsel auf eine andere Liga springt das Datum direkt auf den heutigen oder, falls heute kein Spiel stattfindet, den nächsten Spieltag dieser Liga. Die Datumsanzeige ist bei allen Ligen gleich groß
+- **Top 25 (nur NCAAF/NCAAM):** Nur bei den College-Ligen erscheint neben der Datumsanzeige ein „Top 25”-Schalter; aktiviert, filtert er die Spiele-Liste auf Partien mit mindestens einem Team aus den aktuellen AP Top 25 (anhand von ESPNs `curatedRank`, ohne zusätzlichen API-Aufruf)
 - **Favoriten:** Stern neben einem Team setzen → Spiele werden hervorgehoben und oben einsortiert, zusätzlich in der ★-Liga ligaübergreifend gebündelt
 - **Dunkle Logo-Variante:** Manche ESPN-Logos (z. B. Ohio State) sehen in der eigens fürs Dunkelmodus aufbereiteten Variante besser aus. Langer Druck (Touch oder Maus) auf ein Team-Logo schaltet pro Team dauerhaft auf diese Variante um – die Einstellung wird im Browser gespeichert (`localStorage`) und gilt überall in der App, wo das Logo dieses Teams erscheint (Spielkarten, Tabellen, Gamecast, Profil-Popups)
 - **Design:** Hintergrund der App komplett schwarz
-- **Tabellen:** je Liga passende Spalten, Conferences/Gruppen getrennt, Qualifikations-Markierungen im Fußball
+- **Tabellen:** je Liga passende Spalten, Conferences/Gruppen getrennt, Qualifikations-Markierungen im Fußball. Bei NCAAF/NCAAM (zu viele Conferences für eine gemeinsame Ansicht) per Dropdown wählbar, vorbelegt mit „Top 25“
 - **News:** aktuelle Artikel und Videos je Liga
 - **Spiel-Popup (Klick auf eine Karte):**
   - *NHL:* Gamecast mit Three Stars, Torfolge (inkl. PP/SH/EN), Shot Chart nach Drittel, Teamstatistik-Vergleich, Strafen, Spielinfo · Play-by-Play (filterbar) · Boxscore (Stürmer, Verteidiger, Torhüter) · Spielbericht
@@ -25,8 +25,7 @@ Gehostet auf Vercel, Code auf GitHub – ohne Build-Schritt, ohne Abhängigkeite
   - *Vor Spielbeginn (alle Ligen):* Vorschau mit Saisonduell, Form, voraussichtlichen Torhütern/Pitchern, Topspielern, Ausfällen
   - *Andere Ligen:* allgemeine Übersicht (Linescore, Teamstatistik, Videos, Spielbericht) – eigene Ansichten folgen
   - Laufende Spiele aktualisieren sich im Popup alle 30 s
-- **Tabellen bei NCAAF/NCAAM:** AP Top 25 wird oben in der Tabellenansicht eingeblendet (Rang, Bilanz, Punkte, Trend)
-- **Spieler- & Team-Popups:** Jeder Spielername (Boxscore, Three Stars/Pitching-Entscheidung, Torfolge, Aufstellung, Topspieler, Vorschau) und jedes Team (Spielkarte, Gamecast-Kopf, Tabellen, Top 25) ist anklickbar und öffnet ein eigenes Profil-Popup, auch aus der ★-Favoriten-Ansicht heraus mit korrektem Liga-Kontext:
+- **Spieler- & Team-Popups:** Jeder Spielername (Boxscore, Three Stars/Pitching-Entscheidung, Torfolge, Aufstellung, Topspieler, Vorschau) und jedes Team (Teamname auf der Spielkarte, Gamecast-Kopf, Tabellen, Top 25) ist anklickbar und öffnet ein eigenes Profil-Popup, auch aus der ★-Favoriten-Ansicht heraus mit korrektem Liga-Kontext. Auf der Spielkarte ist nur der Teamname selbst klickbar (nicht die ganze Zeile) – der übrige Platz der Zeile öffnet das Spiel:
   - *Spieler:* Foto, Rückennummer/Position, Status, Körpergröße/-gewicht, Alter, Geburtsort, Erfahrung, Draft, Hand, aktuelle Saisonstatistik, Verletzungsstatus
   - *Team:* Logo, Tabellenplatz, Bilanz (gesamt/Heim/Auswärts), nächstes Spiel – eingefärbt in den Vereinsfarben des Teams (Akzentfarbe & Kopfbereich-Verlauf), damit jedes Team-Popup individuell wirkt
   - Aus dem Spieler-Popup heraus ist das Team ebenfalls anklickbar (verschachteltes Popup)

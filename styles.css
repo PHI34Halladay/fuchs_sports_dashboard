@@ -110,12 +110,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .date-label input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
 .date-label input::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; }
-/* Größere Datumsanzeige, wenn der Platz von "Nur Favoriten"/Aktualisieren frei ist
-   (bei College-Ligen steht an der Stelle stattdessen der Top-25-Filter). */
-.date-label.lg { height: 40px; min-width: 170px; padding: 0 16px; font-size: 18px; font-weight: 700; }
 .toggle { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; }
 .toggle input { accent-color: var(--fav); }
 #top25Toggle input { accent-color: var(--accent); }
+/* [hidden] hat dieselbe CSS-Spezifität wie .toggle, würde ohne diese Regel also
+   trotz des hidden-Attributs angezeigt – daher hier explizit ausblenden. */
+#top25Toggle[hidden] { display: none; }
 
 /* Kurzes visuelles Feedback, wenn ein Logo per Long-Press auf Dark-Mode umgeschaltet wird. */
 [data-team-logo] { touch-action: manipulation; }
@@ -127,6 +127,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
   background: var(--surface); border: 1px solid var(--border); color: var(--muted);
 }
 .status.error { border-color: var(--accent); color: #ffb4b6; }
+
+.conf-picker { margin-bottom: 14px; }
+.conf-picker select {
+  height: 34px; padding: 0 10px; border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--border); color: var(--text);
+  font-weight: 600; font-size: 14px; cursor: pointer;
+}
 
 /* Spiele */
 .group-title {
@@ -149,7 +156,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .team-row { display: grid; grid-template-columns: 22px 28px 1fr auto; align-items: center; gap: 8px; }
 .team-row img { width: 28px; height: 28px; object-fit: contain; }
-.team-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Nur der Text selbst (nicht die ganze Zeile) soll zum Teamprofil führen –
+   der restliche freie Platz in der Zeile öffnet weiterhin das Spiel. */
+.team-name { justify-self: start; width: fit-content; max-width: 100%; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .team-rec { font-size: 12px; color: var(--muted); margin-left: 6px; }
 .team-row.loser .team-name, .team-row.loser .score { color: var(--muted); }
 .score { font-family: var(--display); font-size: 24px; font-weight: 700; min-width: 34px; text-align: right; }
