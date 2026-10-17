@@ -23,6 +23,8 @@ const RE_LEAGUE = /^[a-z0-9.-]{2,40}$/;
 const RE_DATES = /^\d{8}(-\d{8})?$/;
 const RE_NUM = /^\d{1,6}$/;
 const RE_ID = /^\d{1,10}$/;
+const RE_WEEK = /^\d{1,2}$/;
+const RE_SEASONTYPE = /^\d{1}$/;
 
 function buildUrl(q) {
   const { type, sport, league } = q;
@@ -39,6 +41,10 @@ function buildUrl(q) {
       url = `${BASE_SITE}/${sport}/${league}/scoreboard`;
       if (q.dates && RE_DATES.test(q.dates)) params.set('dates', q.dates);
       if (q.groups && RE_NUM.test(q.groups)) params.set('groups', q.groups);
+      // week/seasontype: für wochenbasierte Ligen (NFL/NCAAF) die Spieltage einer
+      // bestimmten Woche abfragen (Kalender liefert dort nur Wochen-Grenzen, keine Tage).
+      if (q.week && RE_WEEK.test(q.week)) params.set('week', q.week);
+      if (q.seasontype && RE_SEASONTYPE.test(q.seasontype)) params.set('seasontype', q.seasontype);
       params.set('limit', '300');
       break;
     case 'summary':

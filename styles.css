@@ -62,7 +62,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .league-dd .dd-caret { font-size: 11px; transition: transform .15s; }
 .league-dd.open .dd-caret { transform: rotate(180deg); }
 .league-dd-menu {
-  display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 20;
+  /* position: fixed statt absolute, weil .leagues horizontal scrollt (overflow-x: auto),
+     was overflow-y implizit auf "auto" setzt und ein absolut positioniertes Menü darunter
+     abschneiden würde. Position wird beim Öffnen per JS aus der Trigger-Position berechnet. */
+  display: none; position: fixed; z-index: 20;
   min-width: 170px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
   padding: 4px; box-shadow: 0 8px 24px rgba(0, 0, 0, .4);
 }

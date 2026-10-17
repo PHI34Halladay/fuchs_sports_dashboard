@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '1.5.0';
+  const VERSION = '1.5.1';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -105,6 +105,88 @@
   // Tagesüberschrift, optional in einer anderen Zeitzone formatiert (US-Ligen → Eastern Time).
   function fmtDayFor(d, tz) {
     return new Intl.DateTimeFormat('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', timeZone: tz }).format(d);
+  }
+
+  // ---------- Spieltage (für Tagesnavigation: nur Tage mit echten Spielen) ----------
+  // ESPNs Scoreboard liefert unter leagues[0].calendar entweder eine flache Liste von
+  // Tagen (NBA/NHL/MLB/NCAAM/Fußball) oder – bei NFL/NCAAF – eine Liste von Saisonphasen
+  // mit Wochen-Einträgen (nur Wochen-Grenzen, keine einzelnen Spieltage). Für Letztere
+  // wird die konkrete Woche (seasontype/week) separat abgefragt, um die echten Spieltage
+  // aus den events dieser Woche zu ermitteln.
+  const gameDayCache = new Map();
+
+  async function gameDaySet(lg, forDate) {
+    if (!lg || lg.isFav) return null;
+    const tz = leagueTZ(lg);
+    const target = forDate instanceof Date ? forDate : state.date;
+
+    const calKey = `${lg.id}:cal`;
+    let cal = gameDayCache.get(calKey);
+    if (cal === undefined) {
+      try {
+        const params = {};
+        if (lg.groups) params.groups = lg.groups;
+        const data = await api('scoreboard', params, lg);
+        cal = data?.leagues?.[0]?.calendar || [];
+      } catch { cal = []; }
+      gameDayCache.set(calKey, cal);
+    }
+    if (!cal.length) return null;
+
+    if (typeof cal[0] === 'string') {
+      const daysKey = `${lg.id}:days`;
+      let days = gameDayCache.get(daysKey);
+      if (!days) {
+        days = new Set(cal.map((iso) => ymdInTZ(new Date(iso), tz)));
+        gameDayCache.set(daysKey, days);
+      }
+      return days;
+    }
+
+    // Wochenbasiert (NFL/NCAAF): passende Saisonphase + Woche für "target" suchen.
+    // Vergleich über Kalendertage (ymdInTZ), nicht über rohe Zeitstempel: der
+    // Mittags-Anker von "target" kann in UTC sonst knapp außerhalb einer Wochengrenze
+    // liegen (Wochen enden laut ESPN z. B. um 06:59Z, Mittag Berlin = 10:00Z).
+    const targetYmd = ymdInTZ(target, tz);
+    let group = null, entry = null;
+    outer: for (const g of cal) {
+      for (const e of g.entries || []) {
+        const sYmd = ymdInTZ(new Date(e.startDate), tz);
+        const eYmd = ymdInTZ(new Date(e.endDate), tz);
+        if (targetYmd >= sYmd && targetYmd <= eYmd) { group = g; entry = e; break outer; }
+      }
+    }
+    if (!entry) return null;
+    const weekKey = `${lg.id}:week:${group.value}:${entry.value}`;
+    let days = gameDayCache.get(weekKey);
+    if (!days) {
+      try {
+        const params = { seasontype: group.value, week: entry.value };
+        if (lg.groups) params.groups = lg.groups;
+        const data = await api('scoreboard', params, lg);
+        days = new Set((data?.events || []).map((ev) => ymdInTZ(new Date(ev.date), tz)));
+      } catch { days = new Set(); }
+      gameDayCache.set(weekKey, days);
+    }
+    return days;
+  }
+
+  // Beim Liga-Wechsel: von heute aus vorwärts zum nächsten Tag mit Spiel springen
+  // (heute selbst, falls dort schon ein Spiel stattfindet).
+  async function snapToGameDay(lg) {
+    if (!lg || lg.isFav) return;
+    let d = todayAnchor();
+    for (let i = 0; i < 60; i++) {
+      const days = await gameDaySet(lg, d);
+      if (!days || !days.size) return;
+      if (days.has(ymdInTZ(d, leagueTZ(lg)))) {
+        if (currentLeague()?.id !== lg.id) return; // Liga wurde inzwischen gewechselt
+        state.date = d;
+        return;
+      }
+      d = new Date(d);
+      d.setDate(d.getDate() + 1);
+    }
   }
 
   async function api(type, params = {}, leagueOverride) {
@@ -543,10 +625,26 @@
     else loadNews();
   }
 
-  function shiftDay(delta) {
-    const d = new Date(state.date);
-    d.setDate(d.getDate() + delta);
-    state.date = d;
+  async function shiftDay(delta) {
+    const lg = currentLeague();
+    const plain = new Date(state.date);
+    plain.setDate(plain.getDate() + delta);
+
+    if (!lg.isFav) {
+      let d = new Date(plain);
+      let found = false;
+      for (let i = 0; i < 60; i++) {
+        const days = await gameDaySet(lg, d);
+        if (!days || !days.size) { found = true; break; } // keine Kalenderdaten → normale ±1-Navigation
+        if (days.has(ymdInTZ(d, leagueTZ(lg)))) { found = true; break; }
+        d.setDate(d.getDate() + delta);
+      }
+      if (currentLeague()?.id !== lg.id) return; // Liga wurde inzwischen gewechselt
+      state.date = found ? d : plain;
+      load();
+      return;
+    }
+    state.date = plain;
     load();
   }
 
@@ -562,6 +660,17 @@
       closeLeagueDropdown();
       dd.classList.toggle('open', willOpen);
       ddToggle.setAttribute('aria-expanded', String(willOpen));
+      if (willOpen) {
+        // .leagues scrollt horizontal (overflow-x: auto) und schneidet damit ein
+        // absolut positioniertes Menü darunter ab → Position fix, aus der Trigger-
+        // Position im Viewport berechnet, statt relativ zum (scrollenden) Elternelement.
+        // Erst "open" setzen (macht das Menü sichtbar), dann messen – offsetWidth
+        // wäre bei display:none sonst 0.
+        const menu = dd.querySelector('.league-dd-menu');
+        const r = ddToggle.getBoundingClientRect();
+        menu.style.top = `${Math.round(r.bottom + 6)}px`;
+        menu.style.left = `${Math.round(Math.min(r.left, window.innerWidth - menu.offsetWidth - 10))}px`;
+      }
       return;
     }
     const btn = e.target.closest('[data-league]');
@@ -575,10 +684,19 @@
     renderLeagueButtons();
     btn.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
     load();
+    // Direkt mit "heute" laden, damit die UI nicht wartet; sobald bekannt ist, ob
+    // heute ein Spieltag ist, ggf. auf den nächsten Spieltag vorspulen und neu laden.
+    const lg = currentLeague();
+    snapToGameDay(lg).then(() => {
+      if (currentLeague()?.id !== lg.id) return;
+      renderDate();
+      if (state.tab === 'scores') load();
+    });
   });
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.league-dd')) closeLeagueDropdown();
   });
+  window.addEventListener('resize', closeLeagueDropdown);
 
   el.tabs.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-tab]');
