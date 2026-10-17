@@ -14,6 +14,7 @@ Gehostet auf Vercel, Code auf GitHub – ohne Build-Schritt, ohne Abhängigkeite
 - **Favoriten:** Stern neben einem Team setzen → Spiele werden hervorgehoben und oben einsortiert, zusätzlich in der ★-Liga ligaübergreifend gebündelt
 - **Dunkle Logo-Variante:** Manche ESPN-Logos (z. B. Ohio State) sehen in der eigens fürs Dunkelmodus aufbereiteten Variante besser aus. Langer Druck (Touch oder Maus) auf ein Team-Logo schaltet pro Team dauerhaft auf diese Variante um – die Einstellung wird im Browser gespeichert (`localStorage`) und gilt überall in der App, wo das Logo dieses Teams erscheint (Spielkarten, Tabellen, Gamecast, Profil-Popups)
 - **Design:** Hintergrund der App komplett schwarz
+- **Auto-Reload:** Schalter im Footer – lädt die Seite alle 30 Sekunden automatisch neu, solange sie geöffnet ist (z. B. für einen dauerhaft angezeigten Bildschirm); Einstellung bleibt gespeichert
 - **Tabellen:** je Liga passende Spalten, Conferences/Gruppen getrennt, Qualifikations-Markierungen im Fußball. Bei NCAAF/NCAAM (zu viele Conferences für eine gemeinsame Ansicht) per Dropdown wählbar, vorbelegt mit „Top 25“
 - **News:** aktuelle Artikel und Videos je Liga
 - **Spiel-Popup (Klick auf eine Karte):**

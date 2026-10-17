@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '1.6.1';
+  const VERSION = '1.7.0';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -49,6 +49,7 @@
     date: todayAnchor(),
     top25Only: !!saved.top25Only,
     standingsConf: null, // Tabellen-Ansicht bei NCAAF/NCAAM: 'top25' oder ein Conference-Name
+    autoReload: !!saved.autoReload,
   };
   let favorites = new Set(readJSON(LS_FAV, []));
   let refreshTimer = null;
@@ -71,6 +72,7 @@
     scoreControls: $('scoreControls'), dateText: $('dateText'), dateInput: $('dateInput'),
     prevDay: $('prevDay'), nextDay: $('nextDay'),
     top25Toggle: $('top25Toggle'), top25Only: $('top25Only'), updated: $('updated'), version: $('version'),
+    autoReload: $('autoReload'),
   };
 
   // ---------- Hilfsfunktionen ----------
@@ -82,7 +84,7 @@
     try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* egal */ }
   }
   function persist() {
-    writeJSON(LS_STATE, { leagueId: state.leagueId, tab: state.tab, top25Only: state.top25Only });
+    writeJSON(LS_STATE, { leagueId: state.leagueId, tab: state.tab, top25Only: state.top25Only, autoReload: state.autoReload });
   }
   function esc(s) {
     return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -753,6 +755,21 @@
     state.top25Only = el.top25Only.checked;
     persist();
     loadScores();
+  });
+
+  // Auto-Reload: lädt die gesamte Seite alle 30 s neu, solange sie geöffnet ist
+  // (z. B. für einen dauerhaft angezeigten Bildschirm) – Einstellung bleibt gespeichert.
+  let autoReloadTimer = null;
+  function setAutoReload(on) {
+    clearInterval(autoReloadTimer);
+    autoReloadTimer = on ? setInterval(() => location.reload(), 30_000) : null;
+  }
+  el.autoReload.checked = state.autoReload;
+  setAutoReload(state.autoReload);
+  el.autoReload.addEventListener('change', () => {
+    state.autoReload = el.autoReload.checked;
+    persist();
+    setAutoReload(state.autoReload);
   });
 
   // Favoriten-Stern und Spielkarte (Event-Delegation)
