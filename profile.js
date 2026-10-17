@@ -127,7 +127,7 @@
         <div class="pf-info">
           <div class="pf-name">${ctx.esc(a.displayName || '')}</div>
           <div class="pf-sub">${a.jersey ? `#${ctx.esc(a.jersey)} · ` : ''}${ctx.esc(pos)}${!statusActive ? ` · <span class="pf-status">${ctx.esc(a.status?.name || '')}</span>` : ''}</div>
-          ${a.team?.id ? `<button type="button" class="pf-team-chip" data-team-id="${ctx.esc(a.team.id)}">${teamLogo ? `<img src="${ctx.esc(teamLogo)}" alt="">` : ''}${ctx.esc(teamName)}</button>` : ''}
+          ${a.team?.id ? `<button type="button" class="pf-team-chip" data-team-id="${ctx.esc(a.team.id)}">${window.LogoPref.img(a.team.id, teamLogo)}${ctx.esc(teamName)}</button>` : ''}
         </div>
       </div>`;
 
@@ -164,7 +164,7 @@
 
     $head.innerHTML = `
       <div class="pf-team-head">
-        ${logo ? `<img class="pf-team-logo" src="${ctx.esc(logo)}" alt="">` : ''}
+        ${window.LogoPref.img(t.id, logo, 'pf-team-logo')}
         <div class="pf-info">
           <div class="pf-name">${ctx.esc(t.displayName || t.name || '')}</div>
           <div class="pf-sub">${ctx.esc(t.standingSummary || '')}</div>

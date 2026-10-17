@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#0d1117" />
+  <meta name="theme-color" content="#000000" />
   <title>Sport Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -38,11 +38,10 @@
           </label>
           <button class="icon-btn" id="nextDay" title="Nächster Tag" aria-label="Nächster Tag">›</button>
         </div>
-        <label class="toggle">
-          <input type="checkbox" id="favOnly" />
-          <span>Nur Favoriten</span>
+        <label class="toggle" id="top25Toggle" hidden>
+          <input type="checkbox" id="top25Only" />
+          <span>Top 25</span>
         </label>
-        <button class="icon-btn" id="refreshBtn" title="Aktualisieren" aria-label="Aktualisieren">↻</button>
       </div>
     </div>
 
@@ -56,6 +55,7 @@
     <span class="version">Version <span id="version"></span></span>
   </footer>
 
+  <script src="logo.js"></script>
   <script src="gamecast.js"></script>
   <script src="profile.js"></script>
   <script src="app.js"></script>

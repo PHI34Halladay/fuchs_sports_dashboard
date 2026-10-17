@@ -9,8 +9,11 @@ Gehostet auf Vercel, Code auf GitHub – ohne Build-Schritt, ohne Abhängigkeite
   (die sieben Fußball-Ligen sind in der Navigation unter einem „⚽ Fußball“-Dropdown zusammengefasst, damit die Leiste übersichtlich bleibt)
 - **★ Favoriten-Liga:** ganz vorne in der Liga-Leiste; zeigt die Spiele aller favorisierten Teams aus allen Ligen gemeinsam an einem Tag (nur Spiele-Ansicht, da ligaübergreifend – Tabelle/News ergeben hier keinen Sinn)
 - **Spiele:** Live-Stände (Auto-Refresh alle 30 s bei laufenden Spielen), Anstoßzeiten in Ortszeit, Bilanz, Top-Performer, TV-Sender, Link zum ESPN-Gamecast
-- **Datumsnavigation:** Tag vor/zurück oder Datum wählen; es wird immer ein konkretes Datum angezeigt, standardmäßig der heutige Tag. Bei den US-Ligen (NFL, NBA, MLB, NHL, NCAAF, NCAAM) wird der Spieltag anhand der US-Ostküstenzeit (Eastern Time) bestimmt statt der deutschen Kalendertage, damit ein Spiel in der Nacht von Samstag auf Sonntag (deutscher Zeit) weiterhin korrekt als Samstagsspiel geführt wird. Tag-vor/-zurück überspringt automatisch spielfreie Tage der jeweiligen Liga (z. B. bei der NFL direkt von Spieltag zu Spieltag statt Tag für Tag durch die Woche); beim Wechsel auf eine andere Liga springt das Datum direkt auf den heutigen oder, falls heute kein Spiel stattfindet, den nächsten Spieltag dieser Liga
-- **Favoriten:** Stern neben einem Team setzen → Spiele werden hervorgehoben und oben einsortiert, Filter „Nur Favoriten“ (gespeichert im Browser), zusätzlich in der ★-Liga ligaübergreifend gebündelt
+- **Datumsnavigation:** Tag vor/zurück oder Datum wählen; es wird immer ein konkretes Datum angezeigt, standardmäßig der heutige Tag. Bei den US-Ligen (NFL, NBA, MLB, NHL, NCAAF, NCAAM) wird der Spieltag anhand der US-Ostküstenzeit (Eastern Time) bestimmt statt der deutschen Kalendertage, damit ein Spiel in der Nacht von Samstag auf Sonntag (deutscher Zeit) weiterhin korrekt als Samstagsspiel geführt wird. Tag-vor/-zurück überspringt automatisch spielfreie Tage der jeweiligen Liga (z. B. bei der NFL direkt von Spieltag zu Spieltag statt Tag für Tag durch die Woche); beim Wechsel auf eine andere Liga springt das Datum direkt auf den heutigen oder, falls heute kein Spiel stattfindet, den nächsten Spieltag dieser Liga. Die Datumsanzeige ist bei allen Ligen außer NCAAF/NCAAM groß dargestellt
+- **Top 25 (NCAAF/NCAAM):** An der Stelle der größeren Datumsanzeige zeigen die College-Ligen stattdessen einen „Top 25”-Schalter; aktiviert, filtert er die Spiele-Liste auf Partien mit mindestens einem Team aus den aktuellen AP Top 25 (anhand von ESPNs `curatedRank`, ohne zusätzlichen API-Aufruf)
+- **Favoriten:** Stern neben einem Team setzen → Spiele werden hervorgehoben und oben einsortiert, zusätzlich in der ★-Liga ligaübergreifend gebündelt
+- **Dunkle Logo-Variante:** Manche ESPN-Logos (z. B. Ohio State) sehen in der eigens fürs Dunkelmodus aufbereiteten Variante besser aus. Langer Druck (Touch oder Maus) auf ein Team-Logo schaltet pro Team dauerhaft auf diese Variante um – die Einstellung wird im Browser gespeichert (`localStorage`) und gilt überall in der App, wo das Logo dieses Teams erscheint (Spielkarten, Tabellen, Gamecast, Profil-Popups)
+- **Design:** Hintergrund der App komplett schwarz
 - **Tabellen:** je Liga passende Spalten, Conferences/Gruppen getrennt, Qualifikations-Markierungen im Fußball
 - **News:** aktuelle Artikel und Videos je Liga
 - **Spiel-Popup (Klick auf eine Karte):**
@@ -38,6 +41,7 @@ espn-dashboard/
 ├── app.js          Frontend-Logik
 ├── gamecast.js     Spiel-Popup (Gamecast, Boxscore, Bericht)
 ├── profile.js      Spieler-/Team-Popup (Profilseite, Teamfarben als Akzent)
+├── logo.js         Gemeinsame Logo-Hilfe (Dark-Mode-Präferenz pro Team, Long-Press-Umschaltung)
 ├── api/
 │   └── espn.js     Vercel-Function: Proxy zur ESPN-API (CORS + Caching)
 ├── vercel.json     Vercel-Einstellungen

@@ -172,6 +172,7 @@
   // ---------- Klickbare Spieler/Teams (öffnen Profile-Popup) ----------
   function teamIdAttr(id) { return id != null && id !== '' ? ` data-team-id="${ctx.esc(String(id))}"` : ''; }
   function playerLink(id, label) { return id != null && id !== '' ? `<span class="gc-link" data-player-id="${ctx.esc(String(id))}">${label}</span>` : label; }
+  const logoImg = (id, url, cls, extra) => (url ? window.LogoPref.img(id, url, cls, extra) : '');
 
   // ---------- Rendering: Rahmen ----------
   function render(keepScroll) {
@@ -228,7 +229,7 @@
 
     const side = (t) => `
       <div class="gc-team gc-link${st.state === 'post' && t.winner === false ? ' lost' : ''}"${teamIdAttr(t.id)}>
-        ${t.logo ? `<img src="${ctx.esc(t.logo)}" alt="">` : ''}
+        ${logoImg(t.id, t.logo)}
         <div class="gc-team-name">${t.rank ? `#${t.rank} ` : ''}${ctx.esc(isSoccer() ? t.short : t.name)}</div>
         <div class="gc-team-rec">${ctx.esc(t.record)}</div>
       </div>`;
@@ -317,7 +318,7 @@
       const a = f.athlete;
       const t = byId[String(f.team?.id)];
       return `<div class="gc-star">
-        <div class="gc-star-img gc-link" data-player-id="${ctx.esc(a.id)}">${a.headshot?.href ? `<img src="${ctx.esc(a.headshot.href)}" alt="" loading="lazy">` : ''}${t?.logo ? `<img class="gc-star-logo gc-link" src="${ctx.esc(t.logo)}" alt=""${teamIdAttr(t.id)}>` : ''}</div>
+        <div class="gc-star-img gc-link" data-player-id="${ctx.esc(a.id)}">${a.headshot?.href ? `<img src="${ctx.esc(a.headshot.href)}" alt="" loading="lazy">` : ''}${t?.logo ? logoImg(t.id, t.logo, 'gc-star-logo gc-link', teamIdAttr(t.id)) : ''}</div>
         <div class="gc-star-label">${label}</div>
         <div class="gc-star-name">${playerLink(a.id, ctx.esc(a.displayName))}</div>
         <div class="gc-star-line">${ctx.esc(line[a.id] || '')}</div>
@@ -370,7 +371,7 @@
         const head = scorer?.athlete?.headshot?.href;
         return `<div class="gc-goal">
           <div class="gc-time">${ctx.esc(p.clock?.displayValue || '')}</div>
-          <div class="gc-goal-img gc-link" data-player-id="${ctx.esc(scorer?.athlete?.id)}">${head ? `<img src="${ctx.esc(head)}" alt="" loading="lazy">` : ''}${t?.logo ? `<img class="gc-goal-logo gc-link" src="${ctx.esc(t.logo)}" alt=""${teamIdAttr(t.id)}>` : ''}</div>
+          <div class="gc-goal-img gc-link" data-player-id="${ctx.esc(scorer?.athlete?.id)}">${head ? `<img src="${ctx.esc(head)}" alt="" loading="lazy">` : ''}${t?.logo ? logoImg(t.id, t.logo, 'gc-goal-logo gc-link', teamIdAttr(t.id)) : ''}</div>
           <div class="gc-goal-txt">
             <div><b>${playerLink(scorer?.athlete?.id, ctx.esc(scorer?.athlete?.displayName || ''))}</b>${scorer?.ytdGoals ? ` <span class="muted">(${scorer.ytdGoals})</span>` : ''} ${strengthBadge(p)}</div>
             <div class="muted">${assists.length ? 'Assists: ' + assists.map((a) => playerLink(a.athlete?.id, ctx.esc(a.athlete?.shortName || a.athlete?.displayName))).join(', ') : 'ohne Assist'}</div>
@@ -396,7 +397,7 @@
         const who = p.participants?.[0]?.athlete;
         return `<div class="gc-pen">
           <div class="gc-time">${ctx.esc(p.clock?.displayValue || '')}</div>
-          ${t?.logo ? `<img class="gc-link" src="${ctx.esc(t.logo)}" alt=""${teamIdAttr(t.id)}>` : '<span></span>'}
+          ${t?.logo ? logoImg(t.id, t.logo, 'gc-link', teamIdAttr(t.id)) : '<span></span>'}
           <div><b>${playerLink(who?.id, ctx.esc(who?.displayName || ''))}</b> <span class="muted">${ctx.esc(p.type.text)}</span></div>
           <div class="gc-pim">${ctx.esc(p.type.penaltyMinutes)} Min.${p.type.penaltyType && p.type.penaltyType !== 'Minor' ? ` <span class="muted">${ctx.esc(p.type.penaltyType)}</span>` : ''}</div>
         </div>`;
@@ -444,12 +445,12 @@
     return section('Shot Chart', `
       <div class="gc-chips">${chips}</div>
       <div class="gc-rink-wrap">
-        <div class="gc-rink-team left gc-link"${teamIdAttr(away.id)}>${away.logo ? `<img src="${ctx.esc(away.logo)}" alt="">` : ''}${ctx.esc(away.abbr)} →</div>
+        <div class="gc-rink-team left gc-link"${teamIdAttr(away.id)}>${logoImg(away.id, away.logo)}${ctx.esc(away.abbr)} →</div>
         <svg class="gc-rink" viewBox="-101 -43.5 202 87" role="img" aria-label="Schusskarte">
           ${RINK}
           ${dots}
         </svg>
-        <div class="gc-rink-team right gc-link"${teamIdAttr(home.id)}>← ${ctx.esc(home.abbr)}${home.logo ? `<img src="${ctx.esc(home.logo)}" alt="">` : ''}</div>
+        <div class="gc-rink-team right gc-link"${teamIdAttr(home.id)}>← ${ctx.esc(home.abbr)}${logoImg(home.id, home.logo)}</div>
       </div>
       <div class="gc-legend">
         <span><svg width="12" height="12" viewBox="-6 -6 12 12"><circle r="4.5" fill="#e6edf3"/></svg>Tor</span>
@@ -561,7 +562,7 @@
       const cls = p.scoringPlay ? ' goal' : isPenalty(p) ? ' pen' : '';
       return `${head}<div class="gc-play${cls}">
         <div class="gc-time">${ctx.esc(p.clock?.displayValue || '')}</div>
-        ${t?.logo ? `<img class="gc-link" src="${ctx.esc(t.logo)}" alt=""${teamIdAttr(t.id)}>` : '<span></span>'}
+        ${t?.logo ? logoImg(t.id, t.logo, 'gc-link', teamIdAttr(t.id)) : '<span></span>'}
         <div>${p.scoringPlay ? '<b>TOR</b> ' : ''}${ctx.esc(p.text || p.type?.text || '')} ${p.scoringPlay ? strengthBadge(p) : ''}</div>
         <div class="gc-play-score">${p.scoringPlay ? ctx.esc(`${p.awayScore}–${p.homeScore}`) : ''}</div>
       </div>`;
@@ -592,7 +593,7 @@
       const team = (d.boxscore.players || []).find((p) => String(p.team?.id) === t.id);
       if (!team) return '';
       const groups = (team.statistics || []).filter((g) => (g.athletes || []).length);
-      return section(`<span class="gc-sec-team gc-link"${teamIdAttr(t.id)}>${t.logo ? `<img src="${ctx.esc(t.logo)}" alt="">` : ''}${ctx.esc(t.name)}</span>`, groups.map((g) => {
+      return section(`<span class="gc-sec-team gc-link"${teamIdAttr(t.id)}>${logoImg(t.id, t.logo)}${ctx.esc(t.name)}</span>`, groups.map((g) => {
         const cols = g.name === 'goalies' ? GOALIE_COLS : SKATER_COLS;
         const idx = (k) => (g.keys || []).indexOf(k);
         const val = (a, k) => {
@@ -643,7 +644,7 @@
         const t = byId[String(p.team?.id)];
         return `<div class="gc-goal">
           <div class="gc-time">${ctx.esc(p.scoringType?.abbreviation || '')}</div>
-          <div class="gc-goal-img">${t?.logo ? `<img class="gc-goal-logo gc-link" src="${ctx.esc(t.logo)}" alt=""${teamIdAttr(t.id)}>` : ''}</div>
+          <div class="gc-goal-img">${t?.logo ? logoImg(t.id, t.logo, 'gc-goal-logo gc-link', teamIdAttr(t.id)) : ''}</div>
           <div class="gc-goal-txt"><div>${ctx.esc((p.text || '').trim())}</div></div>
           <div class="gc-goal-score">${ctx.esc(scoreAfter(d, p))}</div>
         </div>`;
@@ -658,7 +659,7 @@
     return section('Topspieler', `<div class="gc-leaders">${leaders.map((t) => {
       const ti = byId[String(t.team?.id)];
       const cats = (t.leaders || []).filter((c) => wanted.includes(c.name));
-      return `<div><div class="gc-leaders-team gc-link"${teamIdAttr(ti?.id)}>${ti?.logo ? `<img src="${ctx.esc(ti.logo)}" alt="">` : ''}${ctx.esc(ti?.name || '')}</div>
+      return `<div><div class="gc-leaders-team gc-link"${teamIdAttr(ti?.id)}>${logoImg(ti?.id, ti?.logo)}${ctx.esc(ti?.name || '')}</div>
         ${cats.map((cat) => {
           const l = cat.leaders?.[0];
           if (!l) return '';
@@ -692,7 +693,7 @@
         <div class="gc-drive-play"><span class="muted">${ctx.esc(p.start?.downDistanceText || '')}</span> ${ctx.esc(p.text || '')}</div>`).join('') : '';
       return `<div class="gc-drive${dr.isScore ? ' score' : ''}">
         <div class="gc-drive-head">
-          ${t?.logo ? `<img class="gc-link" src="${ctx.esc(t.logo)}" alt=""${teamIdAttr(t.id)}>` : '<span></span>'}
+          ${t?.logo ? logoImg(t.id, t.logo, 'gc-link', teamIdAttr(t.id)) : '<span></span>'}
           <div class="gc-drive-desc"><b class="gc-link"${teamIdAttr(t?.id)}>${ctx.esc(t?.abbr || '')}</b> ${ctx.esc(dr.description || '')}</div>
           <div class="gc-drive-result${dr.isScore ? ' strong' : ''}">${ctx.esc(dr.shortDisplayResult || dr.result || '')}</div>
         </div>
@@ -719,7 +720,7 @@
       const team = (d.boxscore.players || []).find((p) => String(p.team?.id) === t.id);
       if (!team) return '';
       const groups = (team.statistics || []).filter((g) => FOOTBALL_COLS[g.name] && (g.athletes || []).length);
-      return section(`<span class="gc-sec-team gc-link"${teamIdAttr(t.id)}>${t.logo ? `<img src="${ctx.esc(t.logo)}" alt="">` : ''}${ctx.esc(t.name)}</span>`, groups.map((g) => {
+      return section(`<span class="gc-sec-team gc-link"${teamIdAttr(t.id)}>${logoImg(t.id, t.logo)}${ctx.esc(t.name)}</span>`, groups.map((g) => {
         const cols = FOOTBALL_COLS[g.name];
         const idx = (k) => (g.keys || []).indexOf(k);
         const val = (a, k) => { const i = idx(k); return i >= 0 ? a.stats?.[i] ?? '' : ''; };
@@ -779,7 +780,7 @@
     if (!rows.length) return section('Torschützen', '<div class="gc-empty">Keine Tore erfasst.</div>');
     return section('Torschützen', rows.map(({ t, p, goals, og }) => `
       <div class="gc-goal">
-        <div class="gc-goal-img">${t?.logo ? `<img class="gc-goal-logo gc-link" src="${ctx.esc(t.logo)}" alt=""${teamIdAttr(t.id)}>` : ''}</div>
+        <div class="gc-goal-img">${t?.logo ? logoImg(t.id, t.logo, 'gc-goal-logo gc-link', teamIdAttr(t.id)) : ''}</div>
         <div class="gc-goal-txt">
           <div><b>${playerLink(p.athlete?.id, ctx.esc(p.athlete?.displayName || p.athlete?.fullName || ''))}</b>${goals > 1 ? ` <span class="muted">×${goals}</span>` : ''}${og ? ' <span class="muted">(Eigentor)</span>' : ''}</div>
         </div>
@@ -817,7 +818,7 @@
       const t = byId[String(r.team?.id)] || { id: r.team?.id, name: r.team?.displayName, logo: (r.team?.logos || [])[0]?.href };
       const starters = (r.roster || []).filter((p) => p.starter).sort((a, b) => posRank(a) - posRank(b));
       const bench = (r.roster || []).filter((p) => !p.starter).sort((a, b) => posRank(a) - posRank(b));
-      return section(`<span class="gc-sec-team gc-link"${teamIdAttr(t.id)}>${t.logo ? `<img src="${ctx.esc(t.logo)}" alt="">` : ''}${ctx.esc(t.name)}</span>`,
+      return section(`<span class="gc-sec-team gc-link"${teamIdAttr(t.id)}>${logoImg(t.id, t.logo)}${ctx.esc(t.name)}</span>`,
         `<div class="gc-lineup-group">Startelf</div>${starters.map(row).join('') || '<div class="gc-empty">Keine Daten.</div>'}` +
         (bench.length ? `<div class="gc-lineup-group">Ersatzbank</div>${bench.map(row).join('')}` : ''));
     }).join('');
@@ -841,7 +842,7 @@
       const t = byId[String(f.team?.id)];
       const rec = a.record ? `${a.record}${key === 'savingPitcher' && +a.saves > 0 ? `, ${a.saves} SV` : ''}` : '';
       return `<div class="gc-star">
-        <div class="gc-star-img gc-link" data-player-id="${ctx.esc(a.id)}">${a.headshot?.href ? `<img src="${ctx.esc(a.headshot.href)}" alt="" loading="lazy">` : ''}${t?.logo ? `<img class="gc-star-logo gc-link" src="${ctx.esc(t.logo)}" alt=""${teamIdAttr(t.id)}>` : ''}</div>
+        <div class="gc-star-img gc-link" data-player-id="${ctx.esc(a.id)}">${a.headshot?.href ? `<img src="${ctx.esc(a.headshot.href)}" alt="" loading="lazy">` : ''}${t?.logo ? logoImg(t.id, t.logo, 'gc-star-logo gc-link', teamIdAttr(t.id)) : ''}</div>
         <div class="gc-star-label">${label}</div>
         <div class="gc-star-name">${playerLink(a.id, ctx.esc(a.displayName))}</div>
         <div class="gc-star-line">${[rec, line[a.id]].filter(Boolean).join(' · ')}</div>
@@ -860,7 +861,7 @@
         const isHR = p.alternativeType?.type === 'home-run';
         return `<div class="gc-goal">
           <div class="gc-time">${p.period?.type === 'Top' ? '▲' : '▼'}</div>
-          <div class="gc-goal-img">${t?.logo ? `<img class="gc-goal-logo gc-link" src="${ctx.esc(t.logo)}" alt=""${teamIdAttr(t.id)}>` : ''}</div>
+          <div class="gc-goal-img">${t?.logo ? logoImg(t.id, t.logo, 'gc-goal-logo gc-link', teamIdAttr(t.id)) : ''}</div>
           <div class="gc-goal-txt">
             <div>${ctx.esc(p.text || '')} ${isHR ? '<span class="gc-badge pp">HR</span>' : ''}</div>
           </div>
@@ -927,7 +928,7 @@
       const cls = p.scoringPlay ? ' goal' : '';
       return `${head}<div class="gc-play${cls}">
         <div class="gc-time">${p.period?.type === 'Top' ? '▲' : p.period?.type === 'Bottom' ? '▼' : ''}</div>
-        ${t?.logo ? `<img class="gc-link" src="${ctx.esc(t.logo)}" alt=""${teamIdAttr(t.id)}>` : '<span></span>'}
+        ${t?.logo ? logoImg(t.id, t.logo, 'gc-link', teamIdAttr(t.id)) : '<span></span>'}
         <div>${p.scoringPlay ? '<b>PUNKT</b> ' : ''}${ctx.esc(p.text || p.type?.text || '')}</div>
         <div class="gc-play-score">${p.scoringPlay ? ctx.esc(`${p.awayScore}–${p.homeScore}`) : ''}</div>
       </div>`;
@@ -952,7 +953,7 @@
       const team = (d.boxscore.players || []).find((p) => String(p.team?.id) === t.id);
       if (!team) return '';
       const groups = (team.statistics || []).filter((g) => (g.athletes || []).length);
-      return section(`<span class="gc-sec-team gc-link"${teamIdAttr(t.id)}>${t.logo ? `<img src="${ctx.esc(t.logo)}" alt="">` : ''}${ctx.esc(t.name)}</span>`, groups.map((g) => {
+      return section(`<span class="gc-sec-team gc-link"${teamIdAttr(t.id)}>${logoImg(t.id, t.logo)}${ctx.esc(t.name)}</span>`, groups.map((g) => {
         const cols = g.name === 'pitching' ? MLB_PITCHING_COLS : MLB_BATTING_COLS;
         const idx = (k) => (g.keys || []).indexOf(k);
         const val = (a, k) => { const i = idx(k); return i >= 0 ? a.stats?.[i] ?? '' : ''; };
@@ -1035,7 +1036,7 @@
     if (lastFive.length) {
       out.push(section('Form (letzte 5)', lastFive.map((t) => {
         const ti = byId[String(t.team?.id)];
-        return `<div class="gc-form"><span class="gc-form-team gc-link"${teamIdAttr(ti?.id)}>${ti?.logo ? `<img src="${ctx.esc(ti.logo)}" alt="">` : ''}${ctx.esc(t.team?.abbreviation || '')}</span>
+        return `<div class="gc-form"><span class="gc-form-team gc-link"${teamIdAttr(ti?.id)}>${logoImg(ti?.id, ti?.logo)}${ctx.esc(t.team?.abbreviation || '')}</span>
           ${(t.events || []).map((e) => `<span class="gc-res ${ctx.esc((e.gameResult || '').toLowerCase())}" title="${ctx.esc(`${e.atVs || ''} ${e.opponent?.abbreviation || ''} ${e.score || ''}`)}">${ctx.esc(e.gameResult || '–')}</span>`).join('')}
         </div>`;
       }).join('')));
@@ -1053,7 +1054,7 @@
     if (leaders.length) {
       out.push(section('Topspieler der Saison', `<div class="gc-leaders">${leaders.map((t) => {
         const ti = byId[String(t.team?.id)];
-        return `<div><div class="gc-leaders-team gc-link"${teamIdAttr(ti?.id)}>${ti?.logo ? `<img src="${ctx.esc(ti.logo)}" alt="">` : ''}${ctx.esc(ti?.name || t.team?.displayName || '')}</div>
+        return `<div><div class="gc-leaders-team gc-link"${teamIdAttr(ti?.id)}>${logoImg(ti?.id, ti?.logo)}${ctx.esc(ti?.name || t.team?.displayName || '')}</div>
           ${(t.leaders || []).slice(0, 3).map((cat) => {
             const l = cat.leaders?.[0];
             if (!l) return '';

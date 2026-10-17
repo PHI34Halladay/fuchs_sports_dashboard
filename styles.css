@@ -1,5 +1,5 @@
 :root {
-  --bg: #0d1117;
+  --bg: #000000;
   --surface: #161b22;
   --surface-2: #1c232d;
   --border: #2a323d;
@@ -31,7 +31,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* Header */
 .topbar {
   position: sticky; top: 0; z-index: 10;
-  background: rgba(13, 17, 23, 0.92);
+  background: rgba(0, 0, 0, 0.92);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
   padding: 10px 16px;
@@ -110,8 +110,17 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .date-label input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
 .date-label input::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; }
+/* Größere Datumsanzeige, wenn der Platz von "Nur Favoriten"/Aktualisieren frei ist
+   (bei College-Ligen steht an der Stelle stattdessen der Top-25-Filter). */
+.date-label.lg { height: 40px; min-width: 170px; padding: 0 16px; font-size: 18px; font-weight: 700; }
 .toggle { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; }
 .toggle input { accent-color: var(--fav); }
+#top25Toggle input { accent-color: var(--accent); }
+
+/* Kurzes visuelles Feedback, wenn ein Logo per Long-Press auf Dark-Mode umgeschaltet wird. */
+[data-team-logo] { touch-action: manipulation; }
+.logo-toggled-flash { animation: logoFlash .3s ease; }
+@keyframes logoFlash { 0% { filter: brightness(2.2); } 100% { filter: none; } }
 
 .status {
   padding: 12px 14px; border-radius: var(--radius); margin-bottom: 14px;

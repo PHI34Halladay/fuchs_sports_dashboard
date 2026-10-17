@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '1.5.1';
+  const VERSION = '1.6.0';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -31,6 +31,7 @@
   const US_TZ = 'America/New_York';
   const US_LEAGUE_IDS = new Set(['nfl', 'nba', 'mlb', 'nhl', 'cfb', 'cbb']);
   const leagueTZ = (lg) => (lg && US_LEAGUE_IDS.has(lg.id) ? US_TZ : undefined);
+  const COLLEGE_IDS = new Set(['cfb', 'cbb']);
 
   const REFRESH_LIVE_MS = 30_000;
   const LS_FAV = 'sd:favorites';
@@ -43,7 +44,7 @@
     leagueId: initialLeagueId,
     tab: initialLeagueId === FAV_ID ? 'scores' : (['scores', 'standings', 'news'].includes(saved.tab) ? saved.tab : 'scores'),
     date: todayAnchor(),
-    favOnly: !!saved.favOnly,
+    top25Only: !!saved.top25Only,
   };
   let favorites = new Set(readJSON(LS_FAV, []));
   let refreshTimer = null;
@@ -65,7 +66,7 @@
     leagues: $('leagues'), tabs: $('tabs'), content: $('content'), status: $('status'),
     scoreControls: $('scoreControls'), dateText: $('dateText'), dateInput: $('dateInput'),
     prevDay: $('prevDay'), nextDay: $('nextDay'),
-    favOnly: $('favOnly'), refreshBtn: $('refreshBtn'), updated: $('updated'), version: $('version'),
+    top25Toggle: $('top25Toggle'), top25Only: $('top25Only'), updated: $('updated'), version: $('version'),
   };
 
   // ---------- Hilfsfunktionen ----------
@@ -77,7 +78,7 @@
     try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* egal */ }
   }
   function persist() {
-    writeJSON(LS_STATE, { leagueId: state.leagueId, tab: state.tab, favOnly: state.favOnly });
+    writeJSON(LS_STATE, { leagueId: state.leagueId, tab: state.tab, top25Only: state.top25Only });
   }
   function esc(s) {
     return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -241,6 +242,7 @@
   }
   function renderTabs() {
     const isFavView = state.leagueId === FAV_ID;
+    const isCollege = COLLEGE_IDS.has(state.leagueId);
     el.tabs.querySelectorAll('.tab').forEach((b) => {
       const hide = isFavView && b.dataset.tab !== 'scores';
       b.style.display = hide ? 'none' : '';
@@ -249,7 +251,10 @@
       b.setAttribute('aria-selected', active);
     });
     el.scoreControls.style.display = state.tab === 'scores' ? '' : 'none';
-    el.favOnly.closest('.toggle').style.display = isFavView ? 'none' : '';
+    // Bei College-Ligen steht an der Stelle der größeren Datumsanzeige der
+    // Top-25-Filter; sonst bekommt das Datum den freigewordenen Platz.
+    el.top25Toggle.hidden = !isCollege || isFavView;
+    el.dateText.closest('.date-label').classList.toggle('lg', !isCollege && !isFavView);
   }
   function renderDate() {
     el.dateText.textContent = fmtShort.format(state.date);
@@ -287,12 +292,15 @@
     }
   }
 
+  const isTop25 = (c) => c.curatedRank?.current && c.curatedRank.current <= 25;
+
   function renderScores(data, lg) {
     let events = (data.events || []).map((ev) => ({ ev, lg }));
-    if (state.favOnly) {
-      events = events.filter(({ ev: e, lg: l }) => (e.competitions?.[0]?.competitors || []).some((c) => isFav(c.team?.id, l.id)));
+    const top25Active = state.top25Only && COLLEGE_IDS.has(lg.id);
+    if (top25Active) {
+      events = events.filter(({ ev: e }) => (e.competitions?.[0]?.competitors || []).some(isTop25));
     }
-    renderGameList(events, data.week?.number ? ` · Woche ${data.week.number}` : '', state.favOnly ? 'Keine Spiele deiner Favoriten in diesem Zeitraum.' : 'Keine Spiele in diesem Zeitraum.');
+    renderGameList(events, data.week?.number ? ` · Woche ${data.week.number}` : '', top25Active ? 'Keine Top-25-Spiele in diesem Zeitraum.' : 'Keine Spiele in diesem Zeitraum.');
   }
 
   // Gemeinsames Rendering für Einzelliga- und Favoriten-Ansicht: Liste von {ev, lg}-Paaren,
@@ -398,7 +406,7 @@
       return `
         <div class="team-row${loser ? ' loser' : ''}">
           <button class="star${isFav(t.id, lg.id) ? ' on' : ''}" data-fav="${esc(t.id)}" data-fav-league="${esc(lg.id)}" title="Favorit umschalten" aria-label="${esc(t.displayName)} als Favorit">★</button>
-          ${t.logo ? `<img class="gc-link" data-team-id="${esc(t.id)}" src="${esc(t.logo)}" alt="" loading="lazy">` : '<span></span>'}
+          ${t.logo ? window.LogoPref.img(t.id, t.logo, 'gc-link', ` data-team-id="${esc(t.id)}"`) : '<span></span>'}
           <div class="team-name gc-link" data-team-id="${esc(t.id)}">${rank}${esc(soccer ? t.shortDisplayName || t.displayName : t.displayName)}${rec ? `<span class="team-rec">${esc(rec)}</span>` : ''}</div>
           <div class="score">${showScore ? esc(c.score ?? '') : ''}</div>
         </div>`;
@@ -486,7 +494,7 @@
       const trend = r.trend === '-' || !r.trend ? '' : /^\+/.test(r.trend) ? `<span class="rank-up">▲ ${esc(r.trend.slice(1))}</span>` : r.trend === 'NR' ? '' : `<span class="rank-down">▼ ${esc(r.trend.slice(1))}</span>`;
       return `<tr class="${isFav(t.id) ? 'fav' : ''}">
         <td>${esc(r.current)}</td>
-        <td class="team-cell gc-link" data-team-id="${esc(t.id)}">${logo ? `<img src="${esc(logo)}" alt="" loading="lazy">` : ''}<span>${esc(name)}</span></td>
+        <td class="team-cell gc-link" data-team-id="${esc(t.id)}">${logo ? window.LogoPref.img(t.id, logo) : ''}<span>${esc(name)}</span></td>
         <td>${esc(r.recordSummary || '')}</td>
         <td>${esc(r.points ?? '')}</td>
         <td>${trend}</td>
@@ -547,7 +555,7 @@
         }).join('');
         return `<tr class="${isFav(t.id) ? 'fav' : ''}">
           <td>${mark}${i + 1}</td>
-          <td class="team-cell gc-link" data-team-id="${esc(t.id)}">${logo ? `<img src="${esc(logo)}" alt="" loading="lazy">` : ''}<span>${esc(sport === 'soccer' ? t.shortDisplayName || t.displayName : t.displayName)}</span></td>
+          <td class="team-cell gc-link" data-team-id="${esc(t.id)}">${logo ? window.LogoPref.img(t.id, logo) : ''}<span>${esc(sport === 'soccer' ? t.shortDisplayName || t.displayName : t.displayName)}</span></td>
           ${cells}
         </tr>`;
       }).join('');
@@ -714,13 +722,12 @@
     state.date = new Date(y, m - 1, d, 12);
     load();
   });
-  el.favOnly.checked = state.favOnly;
-  el.favOnly.addEventListener('change', () => {
-    state.favOnly = el.favOnly.checked;
+  el.top25Only.checked = state.top25Only;
+  el.top25Only.addEventListener('change', () => {
+    state.top25Only = el.top25Only.checked;
     persist();
     loadScores();
   });
-  el.refreshBtn.addEventListener('click', () => load());
 
   // Favoriten-Stern und Spielkarte (Event-Delegation)
   el.content.addEventListener('click', (e) => {
