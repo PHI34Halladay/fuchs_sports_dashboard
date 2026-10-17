@@ -8,6 +8,7 @@
 
   let ctx = null; // { api, esc }
   let reqId = 0;
+  let activeLeague = null; // { sport, league } – Kontext für verschachtelte Klicks (Team-Chip, nächstes Spiel)
 
   const dlg = document.createElement('dialog');
   dlg.className = 'pf';
@@ -76,11 +77,12 @@
     return id;
   }
 
-  async function openPlayer(id) {
+  async function openPlayer(id, league) {
     if (!ctx || !id) return;
+    if (league) activeLeague = league;
     const myId = startLoad();
     try {
-      const data = await ctx.api('athlete', { id });
+      const data = await ctx.api('athlete', { id }, activeLeague);
       if (myId !== reqId) return;
       renderPlayer(data.athlete || {});
     } catch (e) {
@@ -89,11 +91,12 @@
     }
   }
 
-  async function openTeam(id) {
+  async function openTeam(id, league) {
     if (!ctx || !id) return;
+    if (league) activeLeague = league;
     const myId = startLoad();
     try {
-      const data = await ctx.api('team', { id });
+      const data = await ctx.api('team', { id }, activeLeague);
       if (myId !== reqId) return;
       renderTeam(data.team || {});
     } catch (e) {

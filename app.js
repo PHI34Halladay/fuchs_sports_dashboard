@@ -4,11 +4,13 @@
 (() => {
   'use strict';
 
-  const VERSION = '1.4.1';
+  const VERSION = '1.5.0';
 
   // ---------- Konfiguration ----------
+  const FAV_ID = 'fav';
   // Weitere Ligen einfach hier ergänzen (sport/league = ESPN-Pfad).
   const LEAGUES = [
+    { id: FAV_ID, name: '★', sport: null, league: null, isFav: true },
     { id: 'nfl', name: 'NFL', sport: 'football', league: 'nfl' },
     { id: 'nba', name: 'NBA', sport: 'basketball', league: 'nba' },
     { id: 'mlb', name: 'MLB', sport: 'baseball', league: 'mlb' },
@@ -17,7 +19,18 @@
     { id: 'cbb', name: 'NCAAM', sport: 'basketball', league: 'mens-college-basketball', groups: '50' },
     { id: 'bl1', name: 'Bundesliga', sport: 'soccer', league: 'ger.1' },
     { id: 'bl2', name: '2. Bundesliga', sport: 'soccer', league: 'ger.2' },
+    { id: 'epl', name: 'Premier League', sport: 'soccer', league: 'eng.1' },
+    { id: 'laliga', name: 'La Liga', sport: 'soccer', league: 'esp.1' },
+    { id: 'ligue1', name: 'Ligue 1', sport: 'soccer', league: 'fra.1' },
+    { id: 'seriea', name: 'Serie A', sport: 'soccer', league: 'ita.1' },
+    { id: 'mls', name: 'MLS', sport: 'soccer', league: 'usa.1' },
   ];
+
+  // US-Ligen: Spieltag richtet sich nach US-Eastern-Zeit, nicht nach deutscher
+  // Kalendergrenze (ein Spiel in der Nacht Sa/So deutscher Zeit gehört noch zum Samstag).
+  const US_TZ = 'America/New_York';
+  const US_LEAGUE_IDS = new Set(['nfl', 'nba', 'mlb', 'nhl', 'cfb', 'cbb']);
+  const leagueTZ = (lg) => (lg && US_LEAGUE_IDS.has(lg.id) ? US_TZ : undefined);
 
   const REFRESH_LIVE_MS = 30_000;
   const LS_FAV = 'sd:favorites';
@@ -25,22 +38,33 @@
 
   // ---------- Zustand ----------
   const saved = readJSON(LS_STATE, {});
+  const initialLeagueId = LEAGUES.some((l) => l.id === saved.leagueId) ? saved.leagueId : LEAGUES[1].id;
   const state = {
-    leagueId: LEAGUES.some((l) => l.id === saved.leagueId) ? saved.leagueId : LEAGUES[0].id,
-    tab: ['scores', 'standings', 'news'].includes(saved.tab) ? saved.tab : 'scores',
-    date: null, // null = "Aktuell" (ESPN-Standard: heutiger Spieltag / aktuelle Woche)
+    leagueId: initialLeagueId,
+    tab: initialLeagueId === FAV_ID ? 'scores' : (['scores', 'standings', 'news'].includes(saved.tab) ? saved.tab : 'scores'),
+    date: todayAnchor(),
     favOnly: !!saved.favOnly,
   };
   let favorites = new Set(readJSON(LS_FAV, []));
   let refreshTimer = null;
   let requestId = 0;
+  // Roh-Event-Daten je Liga+ID zwischenspeichern, damit das Gamecast-Popup bei
+  // Fußball einen Score/Status-Fallback hat (ESPNs Summary-Endpoint liefert dort
+  // kein "header" wie bei NFL/NHL/MLB).
+  const eventCache = new Map();
+
+  function todayAnchor() {
+    const d = new Date();
+    d.setHours(12, 0, 0, 0);
+    return d;
+  }
 
   // ---------- DOM ----------
   const $ = (id) => document.getElementById(id);
   const el = {
     leagues: $('leagues'), tabs: $('tabs'), content: $('content'), status: $('status'),
     scoreControls: $('scoreControls'), dateText: $('dateText'), dateInput: $('dateInput'),
-    prevDay: $('prevDay'), nextDay: $('nextDay'), todayBtn: $('todayBtn'),
+    prevDay: $('prevDay'), nextDay: $('nextDay'),
     favOnly: $('favOnly'), refreshBtn: $('refreshBtn'), updated: $('updated'), version: $('version'),
   };
 
@@ -59,8 +83,8 @@
     return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
   const currentLeague = () => LEAGUES.find((l) => l.id === state.leagueId);
-  const favKey = (teamId) => `${state.leagueId}:${teamId}`;
-  const isFav = (teamId) => favorites.has(favKey(teamId));
+  const favKey = (teamId, leagueId = state.leagueId) => `${leagueId}:${teamId}`;
+  const isFav = (teamId, leagueId = state.leagueId) => favorites.has(favKey(teamId, leagueId));
 
   function toYMD(d) {
     return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
@@ -68,13 +92,23 @@
   function toISODate(d) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
+  // Datum eines Zeitpunkts in einer bestimmten Zeitzone als YYYYMMDD (für den ESPN-Request).
+  function ymdInTZ(d, tz) {
+    if (!tz) return toYMD(d);
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d);
+    const get = (t) => parts.find((p) => p.type === t).value;
+    return `${get('year')}${get('month')}${get('day')}`;
+  }
   const fmtTime = new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' });
-  const fmtDay = new Intl.DateTimeFormat('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit' });
   const fmtShort = new Intl.DateTimeFormat('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
   const fmtNews = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  // Tagesüberschrift, optional in einer anderen Zeitzone formatiert (US-Ligen → Eastern Time).
+  function fmtDayFor(d, tz) {
+    return new Intl.DateTimeFormat('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', timeZone: tz }).format(d);
+  }
 
-  async function api(type, params = {}) {
-    const lg = currentLeague();
+  async function api(type, params = {}, leagueOverride) {
+    const lg = leagueOverride || currentLeague();
     const qs = new URLSearchParams({ type, sport: lg.sport, league: lg.league, ...params });
     const res = await fetch(`/api/espn?${qs}`);
     if (!res.ok) {
@@ -98,23 +132,46 @@
   }
 
   // ---------- UI-Aufbau ----------
+  const SOCCER_LEAGUES = LEAGUES.filter((l) => l.sport === 'soccer');
+
   function renderLeagueButtons() {
-    el.leagues.innerHTML = LEAGUES.map((l) =>
-      `<button class="league-btn${l.id === state.leagueId ? ' active' : ''}" data-league="${l.id}">${esc(l.name)}</button>`
-    ).join('');
+    const activeSoccer = SOCCER_LEAGUES.find((l) => l.id === state.leagueId);
+    let html = '';
+    let soccerDone = false;
+    LEAGUES.forEach((l) => {
+      if (l.sport === 'soccer') {
+        if (soccerDone) return;
+        soccerDone = true;
+        html += `
+          <div class="league-dd${activeSoccer ? ' active' : ''}" id="soccerDD">
+            <button type="button" class="league-btn league-dd-trigger" data-dd-toggle="soccer" aria-haspopup="listbox" aria-expanded="false">
+              ⚽ ${esc(activeSoccer ? activeSoccer.name : 'Fußball')} <span class="dd-caret">▾</span>
+            </button>
+            <div class="league-dd-menu" role="listbox">
+              ${SOCCER_LEAGUES.map((s) => `<button type="button" class="league-dd-item${s.id === state.leagueId ? ' active' : ''}" data-league="${s.id}" role="option">${esc(s.name)}</button>`).join('')}
+            </div>
+          </div>`;
+        return;
+      }
+      html += `<button type="button" class="league-btn${l.id === state.leagueId ? ' active' : ''}${l.isFav ? ' league-fav' : ''}" data-league="${l.id}" title="${l.isFav ? 'Favoriten' : esc(l.name)}">${l.isFav ? '★' : esc(l.name)}</button>`;
+    });
+    el.leagues.innerHTML = html;
   }
   function renderTabs() {
+    const isFavView = state.leagueId === FAV_ID;
     el.tabs.querySelectorAll('.tab').forEach((b) => {
+      const hide = isFavView && b.dataset.tab !== 'scores';
+      b.style.display = hide ? 'none' : '';
       const active = b.dataset.tab === state.tab;
       b.classList.toggle('active', active);
       b.setAttribute('aria-selected', active);
     });
     el.scoreControls.style.display = state.tab === 'scores' ? '' : 'none';
+    el.favOnly.closest('.toggle').style.display = isFavView ? 'none' : '';
   }
   function renderDate() {
-    el.dateText.textContent = state.date ? fmtShort.format(state.date) : 'Aktuell';
-    el.dateInput.value = toISODate(state.date || new Date());
-    el.todayBtn.style.display = state.date ? '' : 'none';
+    el.dateText.textContent = fmtShort.format(state.date);
+    el.dateInput.value = toISODate(state.date);
   }
 
   // ---------- Spiele ----------
@@ -122,14 +179,13 @@
     const id = ++requestId;
     if (!silent) { skeleton(); showStatus(''); }
     const lg = currentLeague();
-    const params = {};
-    if (state.date) params.dates = toYMD(state.date);
+    const params = { dates: ymdInTZ(state.date, leagueTZ(lg)) };
     if (lg.groups) params.groups = lg.groups;
 
     try {
       const data = await api('scoreboard', params);
       if (id !== requestId) return;
-      renderScores(data);
+      renderScores(data, lg);
       setUpdated();
       scheduleRefresh(data);
     } catch (e) {
@@ -149,52 +205,91 @@
     }
   }
 
-  function renderScores(data) {
-    let events = data.events || [];
+  function renderScores(data, lg) {
+    let events = (data.events || []).map((ev) => ({ ev, lg }));
     if (state.favOnly) {
-      events = events.filter((ev) => (ev.competitions?.[0]?.competitors || []).some((c) => isFav(c.team?.id)));
+      events = events.filter(({ ev: e, lg: l }) => (e.competitions?.[0]?.competitors || []).some((c) => isFav(c.team?.id, l.id)));
     }
+    renderGameList(events, data.week?.number ? ` · Woche ${data.week.number}` : '', state.favOnly ? 'Keine Spiele deiner Favoriten in diesem Zeitraum.' : 'Keine Spiele in diesem Zeitraum.');
+  }
 
-    if (!events.length) {
-      el.content.innerHTML = `<div class="empty">${state.favOnly ? 'Keine Spiele deiner Favoriten in diesem Zeitraum.' : 'Keine Spiele in diesem Zeitraum.'}</div>`;
+  // Gemeinsames Rendering für Einzelliga- und Favoriten-Ansicht: Liste von {ev, lg}-Paaren,
+  // gruppiert nach Spieltag (zeitzonenbewusst je Liga).
+  function renderGameList(items, label, emptyText) {
+    if (!items.length) {
+      el.content.innerHTML = `<div class="empty">${emptyText}</div>`;
       return;
     }
-
-    // Gruppieren nach Kalendertag (Ortszeit)
     const groups = new Map();
-    events
+    items
       .slice()
-      .sort((a, b) => new Date(a.date) - new Date(b.date))
-      .forEach((ev) => {
-        const day = fmtDay.format(new Date(ev.date));
+      .sort((a, b) => new Date(a.ev.date) - new Date(b.ev.date))
+      .forEach(({ ev, lg }) => {
+        const day = fmtDayFor(new Date(ev.date), leagueTZ(lg));
         if (!groups.has(day)) groups.set(day, []);
-        groups.get(day).push(ev);
+        groups.get(day).push({ ev, lg });
       });
 
     let html = '';
-    const label = data.week?.number ? ` · Woche ${data.week.number}` : '';
     let first = true;
     for (const [day, evs] of groups) {
       // Favoriten-Spiele innerhalb des Tages nach oben
-      evs.sort((a, b) => favScore(b) - favScore(a));
+      evs.sort((a, b) => favScore(b.ev, b.lg) - favScore(a.ev, a.lg));
       html += `<h2 class="group-title">${esc(day)}${first ? esc(label) : ''}</h2>`;
-      html += `<div class="games">${evs.map(gameCard).join('')}</div>`;
+      html += `<div class="games">${evs.map(({ ev, lg }) => gameCard(ev, lg)).join('')}</div>`;
       first = false;
     }
     el.content.innerHTML = html;
   }
 
-  function favScore(ev) {
-    return (ev.competitions?.[0]?.competitors || []).some((c) => isFav(c.team?.id)) ? 1 : 0;
+  // ---------- Favoriten-Ansicht (kombiniert über alle Ligen) ----------
+  async function loadFavoriteScores({ silent = false } = {}) {
+    const id = ++requestId;
+    if (!silent) { skeleton(); showStatus(''); }
+    const favLeagueIds = new Set([...favorites].map((k) => k.split(':')[0]));
+    const targets = LEAGUES.filter((l) => !l.isFav && favLeagueIds.has(l.id));
+    if (!targets.length) {
+      el.content.innerHTML = '<div class="empty">Markiere zuerst Teams als Favorit (★ auf einer Spielkarte), um sie hier gesammelt zu sehen.</div>';
+      setUpdated();
+      return;
+    }
+    try {
+      const results = await Promise.all(targets.map(async (lg) => {
+        const params = { dates: ymdInTZ(state.date, leagueTZ(lg)) };
+        if (lg.groups) params.groups = lg.groups;
+        try { return { lg, data: await api('scoreboard', params, lg) }; }
+        catch { return { lg, data: { events: [] } }; }
+      }));
+      if (id !== requestId) return;
+      const items = [];
+      results.forEach(({ lg, data }) => {
+        (data.events || []).forEach((ev) => {
+          if ((ev.competitions?.[0]?.competitors || []).some((c) => isFav(c.team?.id, lg.id))) items.push({ ev, lg });
+        });
+      });
+      renderGameList(items, '', 'Keine Spiele deiner Favoriten an diesem Tag.');
+      setUpdated();
+      clearTimeout(refreshTimer);
+      const hasLive = items.some(({ ev }) => ev.status?.type?.state === 'in');
+      if (hasLive && state.tab === 'scores') refreshTimer = setTimeout(() => { if (!document.hidden) loadFavoriteScores({ silent: true }); }, REFRESH_LIVE_MS);
+    } catch (e) {
+      if (id !== requestId) return;
+      if (!silent) { el.content.innerHTML = ''; showStatus(`Spiele konnten nicht geladen werden: ${e.message}`, true); }
+    }
   }
 
-  function gameCard(ev) {
+  function favScore(ev, lg) {
+    return (ev.competitions?.[0]?.competitors || []).some((c) => isFav(c.team?.id, lg?.id)) ? 1 : 0;
+  }
+
+  function gameCard(ev, lg) {
+    eventCache.set(`${lg.id}:${ev.id}`, ev);
     const comp = ev.competitions?.[0] || {};
     const st = ev.status?.type || comp.status?.type || {};
     const stateName = st.state; // pre | in | post
     const competitors = (comp.competitors || []).slice();
     // Auswärts oben, Heim unten (US-Konvention); Fußball: Heim oben
-    const soccer = currentLeague().sport === 'soccer';
+    const soccer = lg.sport === 'soccer';
     competitors.sort((a, b) => {
       const order = soccer ? { home: 0, away: 1 } : { away: 0, home: 1 };
       return (order[a.homeAway] ?? 0) - (order[b.homeAway] ?? 0);
@@ -210,7 +305,7 @@
     }
 
     const note = comp.notes?.[0]?.headline;
-    const fav = competitors.some((c) => isFav(c.team?.id));
+    const fav = competitors.some((c) => isFav(c.team?.id, lg.id));
     const showScore = stateName !== 'pre';
 
     const rows = competitors.map((c) => {
@@ -220,7 +315,7 @@
       const loser = stateName === 'post' && c.winner === false && competitors.some((o) => o.winner);
       return `
         <div class="team-row${loser ? ' loser' : ''}">
-          <button class="star${isFav(t.id) ? ' on' : ''}" data-fav="${esc(t.id)}" title="Favorit umschalten" aria-label="${esc(t.displayName)} als Favorit">★</button>
+          <button class="star${isFav(t.id, lg.id) ? ' on' : ''}" data-fav="${esc(t.id)}" data-fav-league="${esc(lg.id)}" title="Favorit umschalten" aria-label="${esc(t.displayName)} als Favorit">★</button>
           ${t.logo ? `<img class="gc-link" data-team-id="${esc(t.id)}" src="${esc(t.logo)}" alt="" loading="lazy">` : '<span></span>'}
           <div class="team-name gc-link" data-team-id="${esc(t.id)}">${rank}${esc(soccer ? t.shortDisplayName || t.displayName : t.displayName)}${rec ? `<span class="team-rec">${esc(rec)}</span>` : ''}</div>
           <div class="score">${showScore ? esc(c.score ?? '') : ''}</div>
@@ -233,7 +328,7 @@
     const link = (ev.links || []).find((l) => l.rel?.includes('summary'))?.href;
 
     return `
-      <article class="game${fav ? ' fav' : ''}${stateName === 'in' ? ' live' : ''}" data-event="${esc(ev.id)}" data-link="${esc(link || '')}" tabindex="0" role="button" aria-label="${esc(ev.name || ev.shortName || 'Spiel')} – Details öffnen">
+      <article class="game${fav ? ' fav' : ''}${stateName === 'in' ? ' live' : ''}" data-event="${esc(ev.id)}" data-link="${esc(link || '')}" data-league-id="${esc(lg.id)}" tabindex="0" role="button" aria-label="${esc(ev.name || ev.shortName || 'Spiel')} – Details öffnen">
         <div class="game-status">${statusHtml}${note ? `<span class="note">${esc(note)}</span>` : ''}</div>
         ${rows}
         ${leaders}
@@ -442,28 +537,47 @@
   function load() {
     renderTabs();
     renderDate();
+    if (state.leagueId === FAV_ID) { loadFavoriteScores(); return; }
     if (state.tab === 'scores') loadScores();
     else if (state.tab === 'standings') loadStandings();
     else loadNews();
   }
 
   function shiftDay(delta) {
-    const d = new Date(state.date || new Date());
-    d.setHours(12, 0, 0, 0);
+    const d = new Date(state.date);
     d.setDate(d.getDate() + delta);
     state.date = d;
     load();
   }
 
+  function closeLeagueDropdown() {
+    el.leagues.querySelector('.league-dd.open')?.classList.remove('open');
+  }
+
   el.leagues.addEventListener('click', (e) => {
+    const ddToggle = e.target.closest('[data-dd-toggle]');
+    if (ddToggle) {
+      const dd = ddToggle.closest('.league-dd');
+      const willOpen = !dd.classList.contains('open');
+      closeLeagueDropdown();
+      dd.classList.toggle('open', willOpen);
+      ddToggle.setAttribute('aria-expanded', String(willOpen));
+      return;
+    }
     const btn = e.target.closest('[data-league]');
-    if (!btn || btn.dataset.league === state.leagueId) return;
+    if (!btn) return;
+    closeLeagueDropdown();
+    if (btn.dataset.league === state.leagueId) return;
     state.leagueId = btn.dataset.league;
-    state.date = null;
+    state.date = todayAnchor();
+    if (state.leagueId === FAV_ID) state.tab = 'scores';
     persist();
     renderLeagueButtons();
     btn.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
     load();
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.league-dd')) closeLeagueDropdown();
   });
 
   el.tabs.addEventListener('click', (e) => {
@@ -476,7 +590,6 @@
 
   el.prevDay.addEventListener('click', () => shiftDay(-1));
   el.nextDay.addEventListener('click', () => shiftDay(1));
-  el.todayBtn.addEventListener('click', () => { state.date = null; load(); });
   el.dateInput.addEventListener('change', () => {
     if (!el.dateInput.value) return;
     const [y, m, d] = el.dateInput.value.split('-').map(Number);
@@ -494,15 +607,16 @@
   // Favoriten-Stern und Spielkarte (Event-Delegation)
   el.content.addEventListener('click', (e) => {
     const teamEl = e.target.closest('[data-team-id]');
-    if (teamEl) { window.Profile.openTeam(teamEl.dataset.teamId); return; }
+    if (teamEl) { window.Profile.openTeam(teamEl.dataset.teamId, cardLeague(teamEl)); return; }
     const playerEl = e.target.closest('[data-player-id]');
-    if (playerEl) { window.Profile.openPlayer(playerEl.dataset.playerId); return; }
+    if (playerEl) { window.Profile.openPlayer(playerEl.dataset.playerId, cardLeague(playerEl)); return; }
     const star = e.target.closest('[data-fav]');
     if (star) {
-      const key = favKey(star.dataset.fav);
+      const key = favKey(star.dataset.fav, star.dataset.favLeague || state.leagueId);
       if (favorites.has(key)) favorites.delete(key); else favorites.add(key);
       writeJSON(LS_FAV, [...favorites]);
-      loadScores({ silent: true });
+      if (state.leagueId === FAV_ID) loadFavoriteScores({ silent: true });
+      else loadScores({ silent: true });
       return;
     }
     if (e.target.closest('a')) return; // ESPN-Link normal öffnen
@@ -516,12 +630,24 @@
   });
 
   function openGame(card) {
-    window.Gamecast.open(card.dataset.event, { link: card.dataset.link || null });
+    const lg = LEAGUES.find((l) => l.id === card.dataset.leagueId) || currentLeague();
+    const event = eventCache.get(`${card.dataset.leagueId}:${card.dataset.event}`) || null;
+    window.Gamecast.open(card.dataset.event, { link: card.dataset.link || null, league: { sport: lg.sport, league: lg.league, id: lg.id }, event });
+  }
+
+  // Liga-Kontext für einen Team-/Spieler-Klick ermitteln: aus der umschließenden Spielkarte
+  // (wichtig in der Favoriten-Ansicht, wo mehrere Ligen gemischt angezeigt werden), sonst aktuelle Liga.
+  function cardLeague(elm) {
+    const lgId = elm.closest('[data-league-id]')?.dataset.leagueId;
+    const lg = LEAGUES.find((l) => l.id === lgId) || currentLeague();
+    return { sport: lg.sport, league: lg.league };
   }
 
   // Beim Zurückkehren zum Tab sofort aktualisieren, falls auf "Spiele"
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && state.tab === 'scores') loadScores({ silent: true });
+    if (document.hidden || state.tab !== 'scores') return;
+    if (state.leagueId === FAV_ID) loadFavoriteScores({ silent: true });
+    else loadScores({ silent: true });
   });
 
   // ---------- Start ----------

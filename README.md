@@ -5,22 +5,25 @@ Gehostet auf Vercel, Code auf GitHub – ohne Build-Schritt, ohne Abhängigkeite
 
 ## Funktionen
 
-- **Ligen:** NFL, NBA, MLB, NHL, NCAAF, NCAAM, Bundesliga, 2. Bundesliga
+- **Ligen:** NFL, NBA, MLB, NHL, NCAAF, NCAAM, Bundesliga, 2. Bundesliga, Premier League, La Liga, Ligue 1, Serie A, MLS
+  (die sieben Fußball-Ligen sind in der Navigation unter einem „⚽ Fußball“-Dropdown zusammengefasst, damit die Leiste übersichtlich bleibt)
+- **★ Favoriten-Liga:** ganz vorne in der Liga-Leiste; zeigt die Spiele aller favorisierten Teams aus allen Ligen gemeinsam an einem Tag (nur Spiele-Ansicht, da ligaübergreifend – Tabelle/News ergeben hier keinen Sinn)
 - **Spiele:** Live-Stände (Auto-Refresh alle 30 s bei laufenden Spielen), Anstoßzeiten in Ortszeit, Bilanz, Top-Performer, TV-Sender, Link zum ESPN-Gamecast
-- **Datumsnavigation:** Tag vor/zurück oder Datum wählen; „Aktuell“ zeigt den laufenden Spieltag bzw. die aktuelle Woche
-- **Favoriten:** Stern neben einem Team setzen → Spiele werden hervorgehoben und oben einsortiert, Filter „Nur Favoriten“ (gespeichert im Browser)
+- **Datumsnavigation:** Tag vor/zurück oder Datum wählen; es wird immer ein konkretes Datum angezeigt, standardmäßig der heutige Tag. Bei den US-Ligen (NFL, NBA, MLB, NHL, NCAAF, NCAAM) wird der Spieltag anhand der US-Ostküstenzeit (Eastern Time) bestimmt statt der deutschen Kalendertage, damit ein Spiel in der Nacht von Samstag auf Sonntag (deutscher Zeit) weiterhin korrekt als Samstagsspiel geführt wird
+- **Favoriten:** Stern neben einem Team setzen → Spiele werden hervorgehoben und oben einsortiert, Filter „Nur Favoriten“ (gespeichert im Browser), zusätzlich in der ★-Liga ligaübergreifend gebündelt
 - **Tabellen:** je Liga passende Spalten, Conferences/Gruppen getrennt, Qualifikations-Markierungen im Fußball
 - **News:** aktuelle Artikel und Videos je Liga
 - **Spiel-Popup (Klick auf eine Karte):**
   - *NHL:* Gamecast mit Three Stars, Torfolge (inkl. PP/SH/EN), Shot Chart nach Drittel, Teamstatistik-Vergleich, Strafen, Spielinfo · Play-by-Play (filterbar) · Boxscore (Stürmer, Verteidiger, Torhüter) · Spielbericht
   - *MLB:* Gamecast mit Pitching-Entscheidung (Gewinner/Save/Verlierer), Punktefolge nach Inning, Linescore inkl. Hits/Errors, Teamstatistik-Vergleich · Play-by-Play (filterbar, auch pitch-genau) · Boxscore (Schlagleute, Pitcher) · Spielbericht
   - *NFL/NCAAF:* Gamecast mit Spielstand-Verlauf (TD/FG-Badges), Teamstatistik-Vergleich, Topspielern (Passing/Rushing/Receiving) · Drives (Drive-Ergebnis oder mit allen Spielzügen, filterbar nach Viertel) · Boxscore (Passing, Rushing, Receiving, Defense, Kicking) · Spielbericht; bei NCAAF Ranking-Badge (#Rang) neben Top-25-Teams
-  - *Videos:* Highlight-Clips direkt im Popup abspielbar, wenn ESPN welche zum Spiel anbietet (NHL, MLB, NFL/NCAAF und weitere Ligen)
+  - *Fußball (alle 7 Ligen):* Spielbericht mit Torschützen (inkl. Eigentore), Teamstatistik-Vergleich (Ballbesitz, Schüsse, Pässe, Flanken, Zweikämpfe, Fouls, Karten, Abseits), Spielinfo (Stadion, Zuschauer, Schiedsrichter) · **Aufstellungen**: Startelf und Ersatzbank beider Teams nach Position sortiert, mit Rückennummer, Ein-/Auswechslungs-Hinweis und Tor-/Vorlagen-/Karten-Badges – jeder Spielername verlinkt direkt ins Spieler-Popup. (ESPNs öffentliche API liefert bei Fußball keine minutengenauen Torereignisse wie bei den US-Ligen, daher ohne Spielminute.)
+  - *Videos:* Highlight-Clips direkt im Popup abspielbar, wenn ESPN welche zum Spiel anbietet (NHL, MLB, NFL/NCAAF, Fußball und weitere Ligen)
   - *Vor Spielbeginn (alle Ligen):* Vorschau mit Saisonduell, Form, voraussichtlichen Torhütern/Pitchern, Topspielern, Ausfällen
   - *Andere Ligen:* allgemeine Übersicht (Linescore, Teamstatistik, Videos, Spielbericht) – eigene Ansichten folgen
   - Laufende Spiele aktualisieren sich im Popup alle 30 s
 - **Tabellen bei NCAAF/NCAAM:** AP Top 25 wird oben in der Tabellenansicht eingeblendet (Rang, Bilanz, Punkte, Trend)
-- **Spieler- & Team-Popups:** Jeder Spielername (Boxscore, Three Stars/Pitching-Entscheidung, Torfolge, Topspieler, Vorschau) und jedes Team (Spielkarte, Gamecast-Kopf, Tabellen, Top 25) ist anklickbar und öffnet ein eigenes Profil-Popup:
+- **Spieler- & Team-Popups:** Jeder Spielername (Boxscore, Three Stars/Pitching-Entscheidung, Torfolge, Aufstellung, Topspieler, Vorschau) und jedes Team (Spielkarte, Gamecast-Kopf, Tabellen, Top 25) ist anklickbar und öffnet ein eigenes Profil-Popup, auch aus der ★-Favoriten-Ansicht heraus mit korrektem Liga-Kontext:
   - *Spieler:* Foto, Rückennummer/Position, Status, Körpergröße/-gewicht, Alter, Geburtsort, Erfahrung, Draft, Hand, aktuelle Saisonstatistik, Verletzungsstatus
   - *Team:* Logo, Tabellenplatz, Bilanz (gesamt/Heim/Auswärts), nächstes Spiel – eingefärbt in den Vereinsfarben des Teams (Akzentfarbe & Kopfbereich-Verlauf), damit jedes Team-Popup individuell wirkt
   - Aus dem Spieler-Popup heraus ist das Team ebenfalls anklickbar (verschachteltes Popup)
@@ -80,10 +83,13 @@ Dann `http://localhost:3000` öffnen. (Einfaches Öffnen der `index.html` reicht
 In `app.js` die Liste `LEAGUES` erweitern, z. B.:
 
 ```js
-{ id: 'epl', name: 'Premier League', sport: 'soccer', league: 'eng.1' },
 { id: 'ucl', name: 'Champions League', sport: 'soccer', league: 'uefa.champions' },
 { id: 'wnba', name: 'WNBA', sport: 'basketball', league: 'wnba' },
 ```
+
+Jeder Eintrag mit `sport: 'soccer'` erscheint automatisch im „⚽ Fußball“-Dropdown
+(`SOCCER_LEAGUES` in `app.js` wird direkt aus `LEAGUES` gefiltert) – für eine weitere
+Fußball-Liga reicht also ein zusätzlicher Eintrag wie oben.
 
 ## Hinweis
 

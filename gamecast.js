@@ -31,7 +31,7 @@
 
   // ---------- Öffnen / Schließen ----------
   function open(eventId, opts = {}) {
-    current = { eventId, link: opts.link, data: null, tab: null, period: 'all', filter: 'key', preview: opts.preview };
+    current = { eventId, link: opts.link, league: opts.league || ctx.league(), event: opts.event || null, data: null, tab: null, period: 'all', filter: 'key', preview: opts.preview };
     $head.innerHTML = opts.preview || '';
     $tabs.innerHTML = '';
     $scroll.scrollTop = 0;
@@ -59,7 +59,7 @@
     if (!current) return;
     const id = ++reqId;
     try {
-      const data = await ctx.api('summary', { event: current.eventId });
+      const data = await ctx.api('summary', { event: current.eventId }, current.league);
       if (id !== reqId || !current) return;
       current.data = data;
       render(silent);
@@ -79,12 +79,14 @@
   }
 
   // ---------- Datenaufbereitung ----------
-  const comp = (d) => d?.header?.competitions?.[0] || {};
+  // Fußball liefert über den Summary-Endpunkt kein "header" (anders als
+  // NFL/NHL/MLB) → auf das beim Öffnen übergebene Scoreboard-Event zurückfallen.
+  const comp = (d) => d?.header?.competitions?.[0] || current?.event?.competitions?.[0] || {};
   const gameState = (d) => comp(d).status?.type?.state || 'pre';
-  const isNHL = () => ctx.league().league === 'nhl';
-  const isMLB = () => ctx.league().league === 'mlb';
-  const isFootball = () => ctx.league().sport === 'football';
-  const isSoccer = () => ctx.league().sport === 'soccer';
+  const isNHL = () => current?.league?.league === 'nhl';
+  const isMLB = () => current?.league?.league === 'mlb';
+  const isFootball = () => current?.league?.sport === 'football';
+  const isSoccer = () => current?.league?.sport === 'soccer';
 
   function teamInfo(c) {
     const t = c.team || {};
@@ -197,6 +199,9 @@
       const hasPbp = isFootball() ? (d.drives?.previous || []).length : (d.plays || []).length;
       if (hasPbp) t.push({ id: 'pbp', label: isFootball() ? 'Drives' : 'Play-by-Play' });
       if ((d.boxscore?.players || []).length) t.push({ id: 'box', label: 'Boxscore' });
+    } else if (isSoccer()) {
+      t.push({ id: 'gamecast', label: 'Spielbericht' });
+      if ((d.rosters || []).length) t.push({ id: 'lineups', label: 'Aufstellungen' });
     } else {
       t.push({ id: 'overview', label: 'Übersicht' });
     }
@@ -216,7 +221,10 @@
     let statusText;
     if (st.state === 'in') statusText = `<span class="live-badge">${ctx.esc(st.shortDetail || 'Live')}</span>`;
     else if (st.state === 'post') statusText = ctx.esc(translate(st.shortDetail || st.detail));
-    else statusText = `${new Intl.DateTimeFormat('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(c.date))} Uhr`;
+    else {
+      const dt = c.date ? new Date(c.date) : null;
+      statusText = dt && !isNaN(dt) ? `${new Intl.DateTimeFormat('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(dt)} Uhr` : '';
+    }
 
     const side = (t) => `
       <div class="gc-team gc-link${st.state === 'post' && t.winner === false ? ' lost' : ''}"${teamIdAttr(t.id)}>
@@ -279,9 +287,10 @@
   function renderBody() {
     const d = current.data;
     switch (current.tab) {
-      case 'gamecast': $body.innerHTML = isMLB() ? mlbGamecast(d) : isFootball() ? footballGamecast(d) : nhlGamecast(d); break;
+      case 'gamecast': $body.innerHTML = isMLB() ? mlbGamecast(d) : isFootball() ? footballGamecast(d) : isSoccer() ? soccerGamecast(d) : nhlGamecast(d); break;
       case 'pbp': $body.innerHTML = isMLB() ? mlbPlayByPlay(d) : isFootball() ? footballDrives(d) : nhlPlayByPlay(d); break;
       case 'box': $body.innerHTML = isMLB() ? mlbBoxscore(d) : isFootball() ? footballBoxscore(d) : nhlBoxscore(d); break;
+      case 'lineups': $body.innerHTML = soccerLineups(d); break;
       case 'recap': $body.innerHTML = recap(d); break;
       case 'preview': $body.innerHTML = preview(d); break;
       default: $body.innerHTML = genericOverview(d);
@@ -728,6 +737,92 @@
     }).join('') + '<div class="gc-note">C/ATT = Pässe · YDS = Yards · TD = Touchdowns · INT = Interceptions · RTG = Passer Rating · ATT = Läufe · REC = Catches · TOT = Tackles gesamt · TFL = Tackles for Loss · PD = Pässe verteidigt · QBH = QB Hits · FG = Field Goals · XP = Extra Points</div>';
   }
 
+  // ---------- Fußball (Soccer): Gamecast ----------
+  const SOCCER_TEAM_STATS = [
+    ['possessionPct', 'Ballbesitz', '%'],
+    ['totalShots', 'Schüsse'],
+    ['shotsOnTarget', 'Davon aufs Tor'],
+    ['wonCorners', 'Eckbälle'],
+    ['totalPasses', 'Pässe'],
+    ['passPct', 'Passquote', '%'],
+    ['totalCrosses', 'Flanken'],
+    ['totalLongBalls', 'Lange Bälle'],
+    ['totalTackles', 'Zweikämpfe'],
+    ['foulsCommitted', 'Fouls'],
+    ['offsides', 'Abseits'],
+    ['yellowCards', 'Gelbe Karten'],
+    ['redCards', 'Rote Karten'],
+  ];
+
+  function soccerGamecast(d) {
+    return [soccerScoringSummary(d), teamStatsCompare(d, SOCCER_TEAM_STATS), videoHighlights(d), gameInfo(d)]
+      .filter(Boolean).join('');
+  }
+
+  const rosterStat = (stats, name) => statOf(stats, name)?.displayValue;
+
+  // ESPNs Soccer-Summary liefert keine Torereignisse mit Minute – die Torschützen
+  // werden daher aus den Aufstellungsstatistiken (rosters[].roster[].stats) ermittelt.
+  function soccerScoringSummary(d) {
+    const rosters = d.rosters || [];
+    if (!rosters.length) return '';
+    const { byId } = teams(d);
+    const rows = [];
+    rosters.forEach((r) => {
+      const t = byId[String(r.team?.id)];
+      (r.roster || []).forEach((p) => {
+        const goals = +rosterStat(p.stats, 'totalGoals') || 0;
+        const og = +rosterStat(p.stats, 'ownGoals') || 0;
+        if (goals || og) rows.push({ t, p, goals, og });
+      });
+    });
+    if (!rows.length) return section('Torschützen', '<div class="gc-empty">Keine Tore erfasst.</div>');
+    return section('Torschützen', rows.map(({ t, p, goals, og }) => `
+      <div class="gc-goal">
+        <div class="gc-goal-img">${t?.logo ? `<img class="gc-goal-logo gc-link" src="${ctx.esc(t.logo)}" alt=""${teamIdAttr(t.id)}>` : ''}</div>
+        <div class="gc-goal-txt">
+          <div><b>${playerLink(p.athlete?.id, ctx.esc(p.athlete?.displayName || p.athlete?.fullName || ''))}</b>${goals > 1 ? ` <span class="muted">×${goals}</span>` : ''}${og ? ' <span class="muted">(Eigentor)</span>' : ''}</div>
+        </div>
+      </div>`).join(''));
+  }
+
+  const SOCCER_POS_ORDER = { G: 0, D: 1, M: 2, F: 3 };
+
+  function soccerLineups(d) {
+    const rosters = d.rosters || [];
+    if (!rosters.length) return '<div class="gc-empty">Keine Aufstellung verfügbar.</div>';
+    const { byId } = teams(d);
+
+    const row = (p) => {
+      const goals = +rosterStat(p.stats, 'totalGoals') || 0;
+      const assists = +rosterStat(p.stats, 'goalAssists') || 0;
+      const yc = +rosterStat(p.stats, 'yellowCards') || 0;
+      const rc = +rosterStat(p.stats, 'redCards') || 0;
+      const badges = [];
+      if (goals) badges.push(`<span class="gc-badge pp" title="Tore">⚽${goals > 1 ? `×${goals}` : ''}</span>`);
+      if (assists) badges.push(`<span class="gc-badge" title="Vorlagen">🅰${assists > 1 ? `×${assists}` : ''}</span>`);
+      if (yc) badges.push(`<span class="gc-badge yc" title="Gelbe Karte">${yc > 1 ? '2×🟨' : '🟨'}</span>`);
+      if (rc) badges.push(`<span class="gc-badge rc" title="Rote Karte">🟥</span>`);
+      const subInfo = p.subbedIn ? ' <span class="muted">(ein)</span>' : p.subbedOut ? ' <span class="muted">(aus)</span>' : '';
+      return `<div class="gc-lineup-row${p.subbedOut ? ' subbed-out' : ''}">
+        <span class="gc-lineup-num muted">${ctx.esc(p.jersey || '')}</span>
+        <span class="gc-lineup-pos muted">${ctx.esc(p.position?.abbreviation || '')}</span>
+        <span class="gc-lineup-name">${playerLink(p.athlete?.id, ctx.esc(p.athlete?.displayName || p.athlete?.fullName || ''))}${subInfo}</span>
+        <span class="gc-lineup-badges">${badges.join('')}</span>
+      </div>`;
+    };
+
+    const posRank = (p) => SOCCER_POS_ORDER[p.position?.abbreviation?.[0]] ?? 9;
+    return rosters.map((r) => {
+      const t = byId[String(r.team?.id)] || { id: r.team?.id, name: r.team?.displayName, logo: (r.team?.logos || [])[0]?.href };
+      const starters = (r.roster || []).filter((p) => p.starter).sort((a, b) => posRank(a) - posRank(b));
+      const bench = (r.roster || []).filter((p) => !p.starter).sort((a, b) => posRank(a) - posRank(b));
+      return section(`<span class="gc-sec-team gc-link"${teamIdAttr(t.id)}>${t.logo ? `<img src="${ctx.esc(t.logo)}" alt="">` : ''}${ctx.esc(t.name)}</span>`,
+        `<div class="gc-lineup-group">Startelf</div>${starters.map(row).join('') || '<div class="gc-empty">Keine Daten.</div>'}` +
+        (bench.length ? `<div class="gc-lineup-group">Ersatzbank</div>${bench.map(row).join('')}` : ''));
+    }).join('');
+  }
+
   // ---------- MLB: Gamecast ----------
   function mlbGamecast(d) {
     return [decisions(d), mlbScoringSummary(d), mlbTeamStatsCompare(d), videoHighlights(d), gameInfo(d)]
@@ -1004,9 +1099,9 @@
   dlg.addEventListener('click', (e) => {
     if (!current?.data) return;
     const teamEl = e.target.closest('[data-team-id]');
-    if (teamEl) { e.stopPropagation(); window.Profile?.openTeam(teamEl.dataset.teamId); return; }
+    if (teamEl) { e.stopPropagation(); window.Profile?.openTeam(teamEl.dataset.teamId, current.league); return; }
     const playerEl = e.target.closest('[data-player-id]');
-    if (playerEl) { e.stopPropagation(); window.Profile?.openPlayer(playerEl.dataset.playerId); return; }
+    if (playerEl) { e.stopPropagation(); window.Profile?.openPlayer(playerEl.dataset.playerId, current.league); return; }
     const tab = e.target.closest('[data-gctab]');
     if (tab) { current.tab = tab.dataset.gctab; current.period = 'all'; render(false); return; }
     const per = e.target.closest('[data-period]');
