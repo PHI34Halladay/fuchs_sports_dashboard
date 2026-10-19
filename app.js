@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '1.8.1';
+  const VERSION = '1.9.0';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -258,12 +258,11 @@
     el.tabs.querySelectorAll('.tab').forEach((b) => {
       const hide = (isFavView && b.dataset.tab !== 'scores') || (isAmateur && b.dataset.tab === 'news');
       b.style.display = hide ? 'none' : '';
-      if (b.dataset.tab === 'scores') b.textContent = isAmateur ? 'Spielplan' : 'Spiele';
       const active = b.dataset.tab === state.tab;
       b.classList.toggle('active', active);
       b.setAttribute('aria-selected', active);
     });
-    el.scoreControls.style.display = state.tab === 'scores' && !isAmateur ? '' : 'none';
+    el.scoreControls.style.display = state.tab === 'scores' ? '' : 'none';
     el.source.textContent = isAmateur
       ? 'Daten: Fussball.de (ausgelesen, ohne Torstände) · Zeiten laut Spielplan'
       : 'Daten: ESPN (inoffizielle öffentliche API) · Zeiten in deiner Ortszeit';
@@ -353,7 +352,8 @@
     if (!silent) { skeleton(); showStatus(''); }
     const favLeagueIds = new Set([...favorites].map((k) => k.split(':')[0]));
     const targets = LEAGUES.filter((l) => !l.isFav && !l.amateur && favLeagueIds.has(l.id));
-    if (!targets.length) {
+    const amateurTargets = LEAGUES.filter((l) => l.amateur && favLeagueIds.has(l.id));
+    if (!targets.length && !amateurTargets.length) {
       el.content.innerHTML = '<div class="empty">Markiere zuerst Teams als Favorit (★ auf einer Spielkarte), um sie hier gesammelt zu sehen.</div>';
       setUpdated();
       return;
@@ -365,6 +365,17 @@
         try { return { lg, data: await api('scoreboard', params, lg) }; }
         catch { return { lg, data: { events: [] } }; }
       }));
+      // Amateurfußball (Fussball.de): Spiele des gewählten Tages mit favorisierten Teams
+      const day = toISODate(state.date);
+      const amateurGroups = (await Promise.all(amateurTargets.map(async (lg) => {
+        try {
+          const data = await amateurData(lg.team);
+          const games = amateurGames(data)
+            .filter((m) => m.date === day && (isFav(amTeamId(m.home), lg.id) || isFav(amTeamId(m.away), lg.id)))
+            .sort(byTime);
+          return games.length ? { lg, games } : null;
+        } catch { return null; }
+      }))).filter(Boolean);
       if (id !== requestId) return;
       const items = [];
       results.forEach(({ lg, data }) => {
@@ -373,6 +384,11 @@
         });
       });
       renderGameList(items, '', 'Keine Spiele deiner Favoriten an diesem Tag.');
+      if (amateurGroups.length) {
+        const html = amateurGroups.map(({ lg, games }) => `<h2 class="group-title">${esc(lg.name)} · Amateurfußball</h2><div class="games">${games.map((m) => amateurCard(m, lg.id)).join('')}</div>`).join('');
+        if (!items.length) el.content.innerHTML = html;
+        else el.content.insertAdjacentHTML('beforeend', html);
+      }
       setUpdated();
       clearTimeout(refreshTimer);
       const hasLive = items.some(({ ev }) => ev.status?.type?.state === 'in');
@@ -680,10 +696,10 @@
     return data;
   }
 
-  async function loadAmateur() {
+  async function loadAmateur({ silent = false } = {}) {
     const id = ++requestId;
     clearTimeout(refreshTimer);
-    skeleton(state.tab === 'standings' ? 3 : 6); showStatus('');
+    if (!silent) { skeleton(state.tab === 'standings' ? 3 : 6); showStatus(''); }
     const lg = currentLeague();
     try {
       const data = await amateurData(lg.team);
@@ -701,54 +717,91 @@
   const clubName = (n) => esc(n).replace(/\//g, '/​');
   const parseYMD = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, 12); };
 
+  // Team-ID für Favoriten: Mannschaftsname in Kurzform (Fussball.de liefert keine IDs im HTML)
+  const amTeamId = (name) => String(name).toLowerCase().replace(/[^a-z0-9äöüß]+/g, '-').replace(/^-|-$/g, '');
+
+  // Alle Spieltage (YYYY-MM-DD, aufsteigend) einer Mannschaft – Grundlage für Tagesnavigation.
+  async function amateurGameDays(lg) {
+    const d = await amateurData(lg.team);
+    return [...new Set([...(d.upcoming || []), ...(d.past || [])].map((m) => m.date))].sort();
+  }
+
+  // Wie bei den ESPN-Ligen: ab heute zum nächsten Tag mit Spielen springen
+  // (heute selbst, falls dort gespielt wird); nach Saisonende zum letzten Spieltag.
+  async function snapAmateur(lg) {
+    try {
+      const days = await amateurGameDays(lg);
+      const today = toISODate(todayAnchor());
+      const target = days.find((d) => d >= today) || days[days.length - 1];
+      if (target && currentLeague()?.id === lg.id) state.date = parseYMD(target);
+    } catch { /* Fehler zeigt loadAmateur an */ }
+  }
+
   function renderAmateur(data) {
     const head = `<h2 class="group-title">${esc(data.team.name)} · ${esc(data.team.league)} <a class="group-link" href="${esc(data.team.url)}" target="_blank" rel="noopener">Fussball.de ↗</a></h2>`;
     const warn = (data.errors || []).length ? `<div class="empty">Teilweise nicht verfügbar: ${esc(data.errors.join(' · '))}</div>` : '';
-    el.content.innerHTML = head + warn + (state.tab === 'standings' ? amateurTableHtml(data) : amateurMatchesHtml(data));
+    el.content.innerHTML = head + warn + (state.tab === 'standings' ? amateurTableHtml(data) : amateurDayHtml(data));
   }
 
   function amateurTableHtml(data) {
     if (!data.table.length) return '<div class="empty">Keine Tabelle verfügbar.</div>';
-    const rows = data.table.map((r) => `<tr class="${r.own ? 'fav' : ''}">
-        <td>${esc(r.rank)}</td>
+    const lgId = currentLeague().id;
+    const rows = data.table.map((r) => {
+      // Platz 1 grün, Platz 2 gelb (jeweils fett); bei punktgleichen Plätzen zählt die Platznummer
+      const rankCls = r.rank === 1 ? ' class="rank-1"' : r.rank === 2 ? ' class="rank-2"' : '';
+      return `<tr class="${r.own || isFav(amTeamId(r.team), lgId) ? 'fav' : ''}">
+        <td${rankCls}>${esc(r.rank)}.</td>
         <td class="team-cell"><span>${clubName(r.team)}</span></td>
         <td>${esc(r.played)}</td><td>${esc(r.won)}</td><td>${esc(r.drawn)}</td><td>${esc(r.lost)}</td>
         <td>${esc(r.gf)}:${esc(r.ga)}</td><td>${esc(r.diff > 0 ? `+${r.diff}` : r.diff)}</td>
         <td class="strong">${esc(r.points)}</td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
     return `<div class="standings-group"><div class="table-wrap"><table>
         <thead><tr><th>#</th><th>Team</th><th>Sp</th><th>S</th><th>U</th><th>N</th><th>Tore</th><th>Diff</th><th>Pkt</th></tr></thead>
         <tbody>${rows}</tbody>
       </table></div></div>`;
   }
 
-  function amateurCard(m) {
-    const day = fmtDayFor(parseYMD(m.date));
-    const when = m.played ? `${day} · beendet` : `${day}${m.time ? ` · ${m.time} Uhr` : ''}`;
+  // Spielkarte im Stil der ESPN-Karten; lgId bestimmt den Favoriten-Schlüssel.
+  function amateurCard(m, lgId) {
+    const when = m.played ? 'Beendet' : `${m.time ? `${m.time} Uhr` : 'Zeit offen'}`;
     const side = m.venue === 'H' ? 'Heim' : m.venue === 'A' ? 'Auswärts' : '';
-    const own = (n) => (n === (m.venue === 'H' ? m.home : m.venue === 'A' ? m.away : null) ? ' own' : '');
+    const ownName = m.venue === 'H' ? m.home : m.venue === 'A' ? m.away : null;
+    const row = (name) => {
+      const id = amTeamId(name);
+      return `<div class="team-row plain">
+          <button class="star${isFav(id, lgId) ? ' on' : ''}" data-fav="${esc(id)}" data-fav-league="${esc(lgId)}" title="Favorit umschalten" aria-label="${esc(name)} als Favorit">★</button>
+          <div class="team-name${name === ownName ? ' own' : ''}">${clubName(name)}</div>
+        </div>`;
+    };
+    const fav = isFav(amTeamId(m.home), lgId) || isFav(amTeamId(m.away), lgId);
     const link = m.url ? `<a href="${esc(m.url)}" target="_blank" rel="noopener">${m.played ? 'Ergebnis ↗' : 'Spiel ↗'}</a>` : '';
     return `
-      <article class="game amateur${m.venue ? ' fav' : ''}">
+      <article class="game amateur${fav ? ' fav' : ''}">
         <div class="game-status"><span>${esc(when)}</span>${side ? `<span class="note">${side}</span>` : ''}</div>
-        <div class="team-row plain"><div class="team-name${own(m.home)}">${clubName(m.home)}</div></div>
-        <div class="team-row plain"><div class="team-name${own(m.away)}">${clubName(m.away)}</div></div>
+        ${row(m.home)}
+        ${row(m.away)}
         ${m.note ? `<div class="leaders">${esc(m.note)}</div>` : ''}
         <div class="game-meta"><span>${esc(m.competition || '')}</span>${link}</div>
       </article>`;
   }
 
-  function amateurMatchesHtml(data) {
-    const next = data.upcoming || [];
-    const past = (data.past || []).slice(0, 8);
-    if (!next.length && !past.length) return '<div class="empty">Keine Spiele gefunden.</div>';
-    let html = '';
-    if (next.length) html += `<h2 class="group-title">Nächste Spiele</h2><div class="games">${next.map(amateurCard).join('')}</div>`;
-    if (past.length) {
-      html += `<h2 class="group-title">Letzte Spiele</h2><div class="games">${past.map(amateurCard).join('')}</div>`;
-      html += '<div class="empty small">Torstände zeigt Fussball.de nur verschleiert an – das Ergebnis steht im Spielbericht (Link „Ergebnis ↗“).</div>';
-    }
-    return html;
+  const amateurGames = (data) => [...(data.upcoming || []), ...(data.past || [])];
+  const byTime = (a, b) => `${a.date}${a.time || ''}`.localeCompare(`${b.date}${b.time || ''}`);
+
+  // Spiele des gewählten Tages (state.date), Favoriten oben
+  function amateurDayHtml(data) {
+    const lgId = currentLeague().id;
+    const day = toISODate(state.date);
+    const games = amateurGames(data).filter((m) => m.date === day).sort(byTime);
+    if (!games.length) return '<div class="empty">Keine Spiele an diesem Tag.</div>';
+    const favFirst = (m) => (isFav(amTeamId(m.home), lgId) || isFav(amTeamId(m.away), lgId) ? 0 : 1);
+    games.sort((a, b) => favFirst(a) - favFirst(b));
+    const note = games.some((m) => m.played)
+      ? '<div class="empty small">Torstände zeigt Fussball.de nur verschleiert an – das Ergebnis steht im Spielbericht (Link „Ergebnis ↗“).</div>'
+      : '';
+    return `<h2 class="group-title">${esc(fmtDayFor(state.date))}</h2><div class="games">${games.map((m) => amateurCard(m, lgId)).join('')}</div>${note}`;
   }
 
   // ---------- Steuerung ----------
@@ -766,6 +819,18 @@
     const lg = currentLeague();
     const plain = new Date(state.date);
     plain.setDate(plain.getDate() + delta);
+
+    if (lg.amateur) {
+      try {
+        const days = await amateurGameDays(lg);
+        const cur = toISODate(state.date);
+        const target = delta > 0 ? days.find((d) => d > cur) : [...days].reverse().find((d) => d < cur);
+        if (currentLeague()?.id !== lg.id) return;
+        if (target) state.date = parseYMD(target);
+      } catch { /* load() zeigt den Fehler */ }
+      load();
+      return;
+    }
 
     if (!lg.isFav) {
       let d = new Date(plain);
@@ -822,6 +887,12 @@
     persist();
     renderLeagueButtons();
     btn.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+    if (currentLeague().amateur) {
+      const alg = currentLeague();
+      renderTabs(); renderDate(); skeleton(); showStatus('');
+      snapAmateur(alg).then(() => { if (currentLeague()?.id === alg.id) load(); });
+      return;
+    }
     load();
     // Direkt mit "heute" laden, damit die UI nicht wartet; sobald bekannt ist, ob
     // heute ein Spieltag ist, ggf. auf den nächsten Spieltag vorspulen und neu laden.
@@ -887,6 +958,7 @@
       if (favorites.has(key)) favorites.delete(key); else favorites.add(key);
       writeJSON(LS_FAV, [...favorites]);
       if (state.leagueId === FAV_ID) loadFavoriteScores({ silent: true });
+      else if (currentLeague().amateur) loadAmateur({ silent: true });
       else loadScores({ silent: true });
       return;
     }
@@ -934,5 +1006,10 @@
   window.Profile.init({ api, esc });
   el.version.textContent = VERSION;
   renderLeagueButtons();
-  load();
+  if (initialLeague.amateur) {
+    renderTabs(); renderDate(); skeleton();
+    snapAmateur(initialLeague).then(() => { if (currentLeague()?.id === initialLeague.id) load(); });
+  } else {
+    load();
+  }
 })();

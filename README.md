@@ -67,7 +67,9 @@ Verwendete ESPN-Endpunkte:
 ## Amateurfußball (SGM I / SGM II)
 
 Zwei Mannschaften der SGM FC Gündelbach/TSV Häfnerhaslach erscheinen als eigene Buttons („SGM I“, „SGM II“)
-neben dem Favoriten-Stern. Sie zeigen Spielplan (nächste/letzte Spiele) und Tabelle von Fussball.de.
+neben dem Favoriten-Stern. Tab „Spiele“ funktioniert wie bei den ESPN-Ligen (Tagesansicht mit Datumsnavigation,
+Sprung zum nächsten Tag mit Spielen; Team-Favoriten per ★, auch in der ★-Ansicht), Tab „Tabelle“ zeigt die Liga-Tabelle
+(Platz 1 grün, Platz 2 gelb). Daten von Fussball.de; es werden die Spiele der jeweiligen Mannschaft angezeigt.
 
 - `api/amateur.js` liest die HTML-Fragmente der Mannschaftsseite (`ajax.team.table`, `ajax.team.matchplan`,
   `ajax.team.prev.games`) und liefert JSON; Antworten werden 15 Minuten im Edge-Netz gecacht.

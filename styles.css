@@ -498,8 +498,10 @@ dialog.pf::backdrop { background: rgba(0, 0, 0, .7); backdrop-filter: blur(3px);
 /* Amateurfußball (Fussball.de) */
 .group-link { color: var(--muted); font-size: 12px; text-transform: none; letter-spacing: 0; margin-left: 8px; text-decoration: none; }
 .group-link:hover { color: var(--text); }
-.team-row.plain { grid-template-columns: 1fr; }
+.team-row.plain { grid-template-columns: 22px 1fr; }
 .game.amateur .team-name { white-space: normal; overflow: visible; text-overflow: clip; }
 .game.amateur .team-name.own { font-weight: 700; }
 td.team-cell:not(.gc-link) span { white-space: normal; min-width: 150px; text-align: left; }
 .empty.small { padding: 16px; font-size: 12px; }
+table td.rank-1 { color: var(--live); font-weight: 700; }
+table td.rank-2 { color: var(--fav); font-weight: 700; }
