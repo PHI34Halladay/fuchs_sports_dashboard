@@ -115,10 +115,22 @@ function absUrl(href) {
 // (Private-Use-Zeichen). Gelesen wird er nicht – nur "es gibt einen Spielstand".
 function hasHiddenScore(row) {
   const m = /<span[^>]*class="score-left"[^>]*>([^<]*)<\/span>/i.exec(row);
-  return !!(m && m[1].trim());
+  // Nur Private-Use-Zeichen zählen; Leerraum/&nbsp; in noch nicht gespielten Spielen nicht.
+  return !!m && /[-]/.test(decode(m[1]));
 }
 
-function parseMatches(html, ownName, { forcePlayed = false } = {}) {
+// Aktueller Zeitpunkt in Berlin als "YYYY-MM-DDTHH:MM" (lexikografisch mit Spielterminen vergleichbar).
+function berlinNow() {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).formatToParts(new Date()).map((x) => [x.type, x.value]),
+  );
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
+}
+
+function parseMatches(html, ownName, { forcePlayed = false, now = berlinNow() } = {}) {
   const own = text(ownName);
   const out = [];
   let ctx = null;
@@ -161,7 +173,8 @@ function parseMatches(html, ownName, { forcePlayed = false } = {}) {
       home,
       away,
       venue: home === own ? 'H' : away === own ? 'A' : null,
-      played: forcePlayed || hasHiddenScore(row),
+      // Ein Spiel in der Zukunft kann nicht gespielt sein, egal was im Ergebnisfeld steht.
+      played: forcePlayed || (hasHiddenScore(row) && `${ctx.date}T${ctx.time || '00:00'}` <= now),
       // Hinweis nur, wenn er mehr als eine Datums-/Zeitangabe enthält (z. B. "abgesagt")
       note: infoText && /[a-zäöüß]{3,}/i.test(infoText) ? infoText : null,
       url: link || null,

@@ -46,7 +46,7 @@ const game = (home, away, { score = false, href = '/spiel/abc/-/spiel/XYZ', info
     <td class="column-score"><a>${
       score
         ? '<span data-obfuscation="abcd1234" class="score-left"></span><span class="colon">:</span><span data-obfuscation="abcd1234" class="score-right"></span>'
-        : '<span class="score-left"></span><span class="colon">:</span><span class="score-right"></span>'
+        : '<span data-obfuscation="abcd1234" class="score-left">&nbsp; </span><span class="colon">:</span><span data-obfuscation="abcd1234" class="score-right">&#160;</span>'
     }${info ? `<span class="info-text">${info}</span>` : ''}</a></td>
     <td class="column-detail"><a href="${href}"><span class="icon-angle-right"></span></a></td>
   </tr>`;
@@ -97,6 +97,12 @@ test('Gespielte Spiele: kein Ergebnis im Output, fremde Links werden verworfen',
 test('Verschleierter Spielstand markiert Spiel als gespielt, auch ohne forcePlayed', () => {
   const m = parseMatches(PREV_HTML, OWN);
   assert.ok(m.every((g) => g.played));
+});
+
+test('Spiel in der Zukunft ist nie "gespielt", auch wenn das Ergebnisfeld Zeichen enthält', () => {
+  const future = `<table>${head('Sonntag, 25.10.2026 - 15:00 Uhr | Kreisliga B')}${comp('So, 25.10.26 | 15:00 Kreisliga B ME | 351402037')}${game(OWN, 'SGM Riexingen', { score: true })}</table>`;
+  assert.equal(parseMatches(future, OWN, { now: '2026-10-19T13:00' })[0].played, false);
+  assert.equal(parseMatches(future, OWN, { now: '2026-10-26T13:00' })[0].played, true);
 });
 
 test('Zusammenführen: sortiert, dedupliziert', () => {
