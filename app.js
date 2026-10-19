@@ -4,13 +4,17 @@
 (() => {
   'use strict';
 
-  const VERSION = '1.7.0';
+  const VERSION = '1.8.0';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
   // Weitere Ligen einfach hier ergänzen (sport/league = ESPN-Pfad).
+  // Einträge mit amateur: true kommen nicht von ESPN, sondern über /api/amateur von Fussball.de
+  // (team = Schlüssel in api/_fussballde.js).
   const LEAGUES = [
     { id: FAV_ID, name: '★', sport: null, league: null, isFav: true },
+    { id: 'sgm1', name: 'SGM I', amateur: true, team: 'sgm1' },
+    { id: 'sgm2', name: 'SGM II', amateur: true, team: 'sgm2' },
     { id: 'nfl', name: 'NFL', sport: 'football', league: 'nfl' },
     { id: 'nba', name: 'NBA', sport: 'basketball', league: 'nba' },
     { id: 'mlb', name: 'MLB', sport: 'baseball', league: 'mlb' },
@@ -42,10 +46,11 @@
 
   // ---------- Zustand ----------
   const saved = readJSON(LS_STATE, {});
-  const initialLeagueId = LEAGUES.some((l) => l.id === saved.leagueId) ? saved.leagueId : LEAGUES[1].id;
+  const initialLeagueId = LEAGUES.some((l) => l.id === saved.leagueId) ? saved.leagueId : 'nfl';
+  const initialLeague = LEAGUES.find((l) => l.id === initialLeagueId);
   const state = {
     leagueId: initialLeagueId,
-    tab: initialLeagueId === FAV_ID ? 'scores' : (['scores', 'standings', 'news'].includes(saved.tab) ? saved.tab : 'scores'),
+    tab: initialLeagueId === FAV_ID ? 'scores' : (['scores', 'standings', 'news'].includes(saved.tab) && !(initialLeague.amateur && saved.tab === 'news') ? saved.tab : 'scores'),
     date: todayAnchor(),
     top25Only: !!saved.top25Only,
     standingsConf: null, // Tabellen-Ansicht bei NCAAF/NCAAM: 'top25' oder ein Conference-Name
@@ -71,7 +76,7 @@
     leagues: $('leagues'), tabs: $('tabs'), content: $('content'), status: $('status'),
     scoreControls: $('scoreControls'), dateText: $('dateText'), dateInput: $('dateInput'),
     prevDay: $('prevDay'), nextDay: $('nextDay'),
-    top25Toggle: $('top25Toggle'), top25Only: $('top25Only'), updated: $('updated'), version: $('version'),
+    top25Toggle: $('top25Toggle'), top25Only: $('top25Only'), updated: $('updated'), version: $('version'), source: $('source'),
     autoReload: $('autoReload'),
   };
 
@@ -123,7 +128,7 @@
   const gameDayCache = new Map();
 
   async function gameDaySet(lg, forDate) {
-    if (!lg || lg.isFav) return null;
+    if (!lg || lg.isFav || lg.amateur) return null;
     const tz = leagueTZ(lg);
     const target = forDate instanceof Date ? forDate : state.date;
 
@@ -181,7 +186,7 @@
   // Beim Liga-Wechsel: von heute aus vorwärts zum nächsten Tag mit Spiel springen
   // (heute selbst, falls dort schon ein Spiel stattfindet).
   async function snapToGameDay(lg) {
-    if (!lg || lg.isFav) return;
+    if (!lg || lg.isFav || lg.amateur) return;
     let d = todayAnchor();
     for (let i = 0; i < 60; i++) {
       const days = await gameDaySet(lg, d);
@@ -249,14 +254,19 @@
   function renderTabs() {
     const isFavView = state.leagueId === FAV_ID;
     const isCollege = COLLEGE_IDS.has(state.leagueId);
+    const isAmateur = !!currentLeague()?.amateur;
     el.tabs.querySelectorAll('.tab').forEach((b) => {
-      const hide = isFavView && b.dataset.tab !== 'scores';
+      const hide = (isFavView && b.dataset.tab !== 'scores') || (isAmateur && b.dataset.tab === 'news');
       b.style.display = hide ? 'none' : '';
+      if (b.dataset.tab === 'scores') b.textContent = isAmateur ? 'Spielplan' : 'Spiele';
       const active = b.dataset.tab === state.tab;
       b.classList.toggle('active', active);
       b.setAttribute('aria-selected', active);
     });
-    el.scoreControls.style.display = state.tab === 'scores' ? '' : 'none';
+    el.scoreControls.style.display = state.tab === 'scores' && !isAmateur ? '' : 'none';
+    el.source.textContent = isAmateur
+      ? 'Daten: Fussball.de (ausgelesen, ohne Torstände) · Zeiten laut Spielplan'
+      : 'Daten: ESPN (inoffizielle öffentliche API) · Zeiten in deiner Ortszeit';
     // Top-25-Filter nur bei den College-Ligen (NCAAF/NCAAM); die Datumsanzeige
     // bleibt dabei bei allen Sportarten gleich groß.
     el.top25Toggle.hidden = !isCollege || isFavView;
@@ -342,7 +352,7 @@
     const id = ++requestId;
     if (!silent) { skeleton(); showStatus(''); }
     const favLeagueIds = new Set([...favorites].map((k) => k.split(':')[0]));
-    const targets = LEAGUES.filter((l) => !l.isFav && favLeagueIds.has(l.id));
+    const targets = LEAGUES.filter((l) => !l.isFav && !l.amateur && favLeagueIds.has(l.id));
     if (!targets.length) {
       el.content.innerHTML = '<div class="empty">Markiere zuerst Teams als Favorit (★ auf einer Spielkarte), um sie hier gesammelt zu sehen.</div>';
       setUpdated();
@@ -650,11 +660,103 @@
     }).join('')}</div>`;
   }
 
+  // ---------- Amateurfußball (Fussball.de über /api/amateur) ----------
+  // Fussball.de verschleiert Torstände bewusst – gespielte Spiele erscheinen daher ohne
+  // Ergebnis, mit Link zum Spielbericht auf Fussball.de.
+  const AMATEUR_TTL_MS = 5 * 60_000;
+  const amateurCache = new Map(); // teamKey → { t, data }
+
+  async function amateurData(teamKey) {
+    const hit = amateurCache.get(teamKey);
+    if (hit && Date.now() - hit.t < AMATEUR_TTL_MS) return hit.data;
+    const res = await fetch(`/api/amateur?${new URLSearchParams({ team: teamKey })}`);
+    if (!res.ok) {
+      let msg = `Fehler ${res.status}`;
+      try { msg = (await res.json()).error || msg; } catch { /* ignore */ }
+      throw new Error(msg);
+    }
+    const data = await res.json();
+    amateurCache.set(teamKey, { t: Date.now(), data });
+    return data;
+  }
+
+  async function loadAmateur() {
+    const id = ++requestId;
+    clearTimeout(refreshTimer);
+    skeleton(state.tab === 'standings' ? 3 : 6); showStatus('');
+    const lg = currentLeague();
+    try {
+      const data = await amateurData(lg.team);
+      if (id !== requestId) return;
+      renderAmateur(data);
+      setUpdated();
+    } catch (e) {
+      if (id !== requestId) return;
+      el.content.innerHTML = '';
+      showStatus(`Daten von Fussball.de konnten nicht geladen werden: ${e.message}`, true);
+    }
+  }
+
+  // Zero-Width-Space nach "/" erlaubt Zeilenumbruch in langen SGM-Namen
+  const clubName = (n) => esc(n).replace(/\//g, '/​');
+  const parseYMD = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, 12); };
+
+  function renderAmateur(data) {
+    const head = `<h2 class="group-title">${esc(data.team.name)} · ${esc(data.team.league)} <a class="group-link" href="${esc(data.team.url)}" target="_blank" rel="noopener">Fussball.de ↗</a></h2>`;
+    const warn = (data.errors || []).length ? `<div class="empty">Teilweise nicht verfügbar: ${esc(data.errors.join(' · '))}</div>` : '';
+    el.content.innerHTML = head + warn + (state.tab === 'standings' ? amateurTableHtml(data) : amateurMatchesHtml(data));
+  }
+
+  function amateurTableHtml(data) {
+    if (!data.table.length) return '<div class="empty">Keine Tabelle verfügbar.</div>';
+    const rows = data.table.map((r) => `<tr class="${r.own ? 'fav' : ''}">
+        <td>${esc(r.rank)}</td>
+        <td class="team-cell"><span>${clubName(r.team)}</span></td>
+        <td>${esc(r.played)}</td><td>${esc(r.won)}</td><td>${esc(r.drawn)}</td><td>${esc(r.lost)}</td>
+        <td>${esc(r.gf)}:${esc(r.ga)}</td><td>${esc(r.diff > 0 ? `+${r.diff}` : r.diff)}</td>
+        <td class="strong">${esc(r.points)}</td>
+      </tr>`).join('');
+    return `<div class="standings-group"><div class="table-wrap"><table>
+        <thead><tr><th>#</th><th>Team</th><th>Sp</th><th>S</th><th>U</th><th>N</th><th>Tore</th><th>Diff</th><th>Pkt</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div></div>`;
+  }
+
+  function amateurCard(m) {
+    const day = fmtDayFor(parseYMD(m.date));
+    const when = m.played ? `${day} · beendet` : `${day}${m.time ? ` · ${m.time} Uhr` : ''}`;
+    const side = m.venue === 'H' ? 'Heim' : m.venue === 'A' ? 'Auswärts' : '';
+    const own = (n) => (n === (m.venue === 'H' ? m.home : m.venue === 'A' ? m.away : null) ? ' own' : '');
+    const link = m.url ? `<a href="${esc(m.url)}" target="_blank" rel="noopener">${m.played ? 'Ergebnis ↗' : 'Spiel ↗'}</a>` : '';
+    return `
+      <article class="game amateur${m.venue ? ' fav' : ''}">
+        <div class="game-status"><span>${esc(when)}</span>${side ? `<span class="note">${side}</span>` : ''}</div>
+        <div class="team-row plain"><div class="team-name${own(m.home)}">${clubName(m.home)}</div></div>
+        <div class="team-row plain"><div class="team-name${own(m.away)}">${clubName(m.away)}</div></div>
+        ${m.note ? `<div class="leaders">${esc(m.note)}</div>` : ''}
+        <div class="game-meta"><span>${esc(m.competition || '')}</span>${link}</div>
+      </article>`;
+  }
+
+  function amateurMatchesHtml(data) {
+    const next = data.upcoming || [];
+    const past = (data.past || []).slice(0, 8);
+    if (!next.length && !past.length) return '<div class="empty">Keine Spiele gefunden.</div>';
+    let html = '';
+    if (next.length) html += `<h2 class="group-title">Nächste Spiele</h2><div class="games">${next.map(amateurCard).join('')}</div>`;
+    if (past.length) {
+      html += `<h2 class="group-title">Letzte Spiele</h2><div class="games">${past.map(amateurCard).join('')}</div>`;
+      html += '<div class="empty small">Torstände zeigt Fussball.de nur verschleiert an – das Ergebnis steht im Spielbericht (Link „Ergebnis ↗“).</div>';
+    }
+    return html;
+  }
+
   // ---------- Steuerung ----------
   function load() {
     renderTabs();
     renderDate();
     if (state.leagueId === FAV_ID) { loadFavoriteScores(); return; }
+    if (currentLeague().amateur) { loadAmateur(); return; }
     if (state.tab === 'scores') loadScores();
     else if (state.tab === 'standings') loadStandings();
     else loadNews();
@@ -716,6 +818,7 @@
     state.date = todayAnchor();
     state.standingsConf = null;
     if (state.leagueId === FAV_ID) state.tab = 'scores';
+    if (currentLeague().amateur && state.tab === 'news') state.tab = 'scores';
     persist();
     renderLeagueButtons();
     btn.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
@@ -821,6 +924,7 @@
   // Beim Zurückkehren zum Tab sofort aktualisieren, falls auf "Spiele"
   document.addEventListener('visibilitychange', () => {
     if (document.hidden || state.tab !== 'scores') return;
+    if (currentLeague().amateur) return; // Fussball.de-Daten werden gecacht, kein Live-Refresh nötig
     if (state.leagueId === FAV_ID) loadFavoriteScores({ silent: true });
     else loadScores({ silent: true });
   });

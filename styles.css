@@ -494,3 +494,12 @@ dialog.pf::backdrop { background: rgba(0, 0, 0, .7); backdrop-filter: blur(3px);
   .pf-headshot, .pf-team-logo { width: 56px; height: 56px; }
   .pf-name { font-size: 18px; }
 }
+
+/* Amateurfußball (Fussball.de) */
+.group-link { color: var(--muted); font-size: 12px; text-transform: none; letter-spacing: 0; margin-left: 8px; text-decoration: none; }
+.group-link:hover { color: var(--text); }
+.team-row.plain { grid-template-columns: 1fr; }
+.game.amateur .team-name { white-space: normal; overflow: visible; text-overflow: clip; }
+.game.amateur .team-name.own { font-weight: 700; }
+td.team-cell:not(.gc-link) span { white-space: normal; min-width: 150px; text-align: left; }
+.empty.small { padding: 16px; font-size: 12px; }

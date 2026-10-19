@@ -64,6 +64,20 @@ Verwendete ESPN-Endpunkte:
 | team | `site.api.espn.com/apis/site/v2/sports/{sport}/{league}/teams/{id}` (Team-Popup) |
 | athlete | `site.web.api.espn.com/apis/common/v3/sports/{sport}/{league}/athletes/{id}` (Spieler-Popup) |
 
+## Amateurfußball (SGM I / SGM II)
+
+Zwei Mannschaften der SGM FC Gündelbach/TSV Häfnerhaslach erscheinen als eigene Buttons („SGM I“, „SGM II“)
+neben dem Favoriten-Stern. Sie zeigen Spielplan (nächste/letzte Spiele) und Tabelle von Fussball.de.
+
+- `api/amateur.js` liest die HTML-Fragmente der Mannschaftsseite (`ajax.team.table`, `ajax.team.matchplan`,
+  `ajax.team.prev.games`) und liefert JSON; Antworten werden 15 Minuten im Edge-Netz gecacht.
+- `api/_fussballde.js` enthält Mannschaftskonfiguration und Parser (`npm test` prüft ihn).
+- **Keine Torstände:** Fussball.de verschleiert Ergebnisse (jede Ziffer ist ein Sonderzeichen einer
+  seitenspezifischen Schriftart). Das wird bewusst nicht umgangen; gespielte Spiele verlinken auf den Spielbericht.
+- **Neue Saison:** In `TEAMS` (`api/_fussballde.js`) `saison`, `staffelId` und ggf. `league` anpassen
+  (Team-ID bleibt gleich, die Staffel-ID steht im Ajax-Link der Mannschaftsseite).
+- Ändert Fussball.de sein HTML, liefert die Function einen Fehler bzw. leere Listen – dann den Parser anpassen.
+
 ## Deployment
 
 1. Neues Repository auf GitHub anlegen (z. B. `espn-dashboard`) und den Inhalt dieses Ordners hochladen
