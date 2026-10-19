@@ -4,13 +4,14 @@
 (() => {
   'use strict';
 
-  const VERSION = '1.10.0';
+  const VERSION = '1.11.0';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
   // Weitere Ligen einfach hier ergänzen (sport/league = ESPN-Pfad).
   // Einträge mit amateur: true kommen nicht von ESPN, sondern über /api/amateur von Fussball.de
-  // (team = Schlüssel in api/_fussballde.js).
+  // (team = Schlüssel in api/_fussballde.js). Einträge mit hockey kommen über /api/hockey von
+  // Hockeyweb.de (hockey = Schlüssel in api/_hockeyweb.js).
   const LEAGUES = [
     { id: FAV_ID, name: '★', sport: null, league: null, isFav: true },
     { id: 'sgm1', name: 'SGM I', amateur: true, team: 'sgm1' },
@@ -19,6 +20,13 @@
     { id: 'nba', name: 'NBA', sport: 'basketball', league: 'nba' },
     { id: 'mlb', name: 'MLB', sport: 'baseball', league: 'mlb' },
     { id: 'nhl', name: 'NHL', sport: 'hockey', league: 'nhl' },
+    { id: 'del', name: 'DEL', hockey: 'del' },
+    { id: 'del2', name: 'DEL2', hockey: 'del2' },
+    { id: 'obs', name: 'Oberliga Süd', hockey: 'obs' },
+    { id: 'obn', name: 'Oberliga Nord', hockey: 'obn' },
+    { id: 'nl', name: 'NL', hockey: 'nl' },
+    { id: 'icehl', name: 'ICEHL', hockey: 'icehl' },
+    { id: 'chl', name: 'CHL', hockey: 'chl' },
     { id: 'cfb', name: 'NCAAF', sport: 'football', league: 'college-football', groups: '80' },
     { id: 'cbb', name: 'NCAAM', sport: 'basketball', league: 'mens-college-basketball', groups: '50' },
     { id: 'bl1', name: 'Bundesliga', sport: 'soccer', league: 'ger.1' },
@@ -40,6 +48,10 @@
   const leagueTZ = (lg) => (lg && US_LEAGUE_IDS.has(lg.id) ? US_TZ : undefined);
   const COLLEGE_IDS = new Set(['cfb', 'cbb']);
 
+  // Ligen mit eigener Datenquelle (Fussball.de bzw. Hockeyweb) laufen nicht über die ESPN-API
+  // und haben keinen News-Tab.
+  function isOwnSource(l) { return !!(l && (l.amateur || l.hockey)); }
+
   const REFRESH_LIVE_MS = 30_000;
   const LS_FAV = 'sd:favorites';
   const LS_STATE = 'sd:state';
@@ -50,7 +62,7 @@
   const initialLeague = LEAGUES.find((l) => l.id === initialLeagueId);
   const state = {
     leagueId: initialLeagueId,
-    tab: initialLeagueId === FAV_ID ? 'scores' : (['scores', 'standings', 'news'].includes(saved.tab) && !(initialLeague.amateur && saved.tab === 'news') ? saved.tab : 'scores'),
+    tab: initialLeagueId === FAV_ID ? 'scores' : (['scores', 'standings', 'news'].includes(saved.tab) && !(isOwnSource(initialLeague) && saved.tab === 'news') ? saved.tab : 'scores'),
     date: todayAnchor(),
     top25Only: !!saved.top25Only,
     standingsConf: null, // Tabellen-Ansicht bei NCAAF/NCAAM: 'top25' oder ein Conference-Name
@@ -128,7 +140,7 @@
   const gameDayCache = new Map();
 
   async function gameDaySet(lg, forDate) {
-    if (!lg || lg.isFav || lg.amateur) return null;
+    if (!lg || lg.isFav || isOwnSource(lg)) return null;
     const tz = leagueTZ(lg);
     const target = forDate instanceof Date ? forDate : state.date;
 
@@ -186,7 +198,7 @@
   // Beim Liga-Wechsel: von heute aus vorwärts zum nächsten Tag mit Spiel springen
   // (heute selbst, falls dort schon ein Spiel stattfindet).
   async function snapToGameDay(lg) {
-    if (!lg || lg.isFav || lg.amateur) return;
+    if (!lg || lg.isFav || isOwnSource(lg)) return;
     let d = todayAnchor();
     for (let i = 0; i < 60; i++) {
       const days = await gameDaySet(lg, d);
@@ -226,23 +238,29 @@
   }
 
   // ---------- UI-Aufbau ----------
-  const SOCCER_LEAGUES = LEAGUES.filter((l) => l.sport === 'soccer');
+  // Ligen-Gruppen, die als Dropdown erscheinen (an der Stelle ihrer ersten Liga in LEAGUES)
+  const LEAGUE_GROUPS = [
+    { key: 'soccer', icon: '⚽', label: 'Fußball', match: (l) => l.sport === 'soccer' },
+    { key: 'hockey', icon: '🏒', label: 'Eishockey', match: (l) => !!l.hockey },
+  ];
 
   function renderLeagueButtons() {
-    const activeSoccer = SOCCER_LEAGUES.find((l) => l.id === state.leagueId);
     let html = '';
-    let soccerDone = false;
+    const done = new Set();
     LEAGUES.forEach((l) => {
-      if (l.sport === 'soccer') {
-        if (soccerDone) return;
-        soccerDone = true;
+      const grp = LEAGUE_GROUPS.find((g) => g.match(l));
+      if (grp) {
+        if (done.has(grp.key)) return;
+        done.add(grp.key);
+        const members = LEAGUES.filter(grp.match);
+        const active = members.find((m) => m.id === state.leagueId);
         html += `
-          <div class="league-dd${activeSoccer ? ' active' : ''}" id="soccerDD">
-            <button type="button" class="league-btn league-dd-trigger" data-dd-toggle="soccer" aria-haspopup="listbox" aria-expanded="false">
-              ⚽ ${esc(activeSoccer ? activeSoccer.name : 'Fußball')} <span class="dd-caret">▾</span>
+          <div class="league-dd${active ? ' active' : ''}" id="${grp.key}DD">
+            <button type="button" class="league-btn league-dd-trigger" data-dd-toggle="${grp.key}" aria-haspopup="listbox" aria-expanded="false">
+              ${grp.icon} ${esc(active ? active.name : grp.label)} <span class="dd-caret">▾</span>
             </button>
             <div class="league-dd-menu" role="listbox">
-              ${SOCCER_LEAGUES.map((s) => `<button type="button" class="league-dd-item${s.id === state.leagueId ? ' active' : ''}" data-league="${s.id}" role="option">${esc(s.name)}</button>`).join('')}
+              ${members.map((s) => `<button type="button" class="league-dd-item${s.id === state.leagueId ? ' active' : ''}" data-league="${s.id}" role="option">${esc(s.name)}</button>`).join('')}
             </div>
           </div>`;
         return;
@@ -255,8 +273,9 @@
     const isFavView = state.leagueId === FAV_ID;
     const isCollege = COLLEGE_IDS.has(state.leagueId);
     const isAmateur = !!currentLeague()?.amateur;
+    const isHockey = !!currentLeague()?.hockey;
     el.tabs.querySelectorAll('.tab').forEach((b) => {
-      const hide = (isFavView && b.dataset.tab !== 'scores') || (isAmateur && b.dataset.tab === 'news');
+      const hide = (isFavView && b.dataset.tab !== 'scores') || ((isAmateur || isHockey) && b.dataset.tab === 'news');
       b.style.display = hide ? 'none' : '';
       const active = b.dataset.tab === state.tab;
       b.classList.toggle('active', active);
@@ -265,7 +284,9 @@
     el.scoreControls.style.display = state.tab === 'scores' ? '' : 'none';
     el.source.textContent = isAmateur
       ? 'Daten: Fussball.de (ausgelesen, ohne Torstände) · Zeiten laut Spielplan'
-      : 'Daten: ESPN (inoffizielle öffentliche API) · Zeiten in deiner Ortszeit';
+      : isHockey
+        ? 'Daten: Hockeyweb.de (ausgelesen) · Zeiten in deutscher Zeit'
+        : 'Daten: ESPN (inoffizielle öffentliche API) · Zeiten in deiner Ortszeit';
     // Top-25-Filter nur bei den College-Ligen (NCAAF/NCAAM); die Datumsanzeige
     // bleibt dabei bei allen Sportarten gleich groß.
     el.top25Toggle.hidden = !isCollege || isFavView;
@@ -351,9 +372,10 @@
     const id = ++requestId;
     if (!silent) { skeleton(); showStatus(''); }
     const favLeagueIds = new Set([...favorites].map((k) => k.split(':')[0]));
-    const targets = LEAGUES.filter((l) => !l.isFav && !l.amateur && favLeagueIds.has(l.id));
+    const targets = LEAGUES.filter((l) => !l.isFav && !isOwnSource(l) && favLeagueIds.has(l.id));
     const amateurTargets = LEAGUES.filter((l) => l.amateur && favLeagueIds.has(l.id));
-    if (!targets.length && !amateurTargets.length) {
+    const hockeyTargets = LEAGUES.filter((l) => l.hockey && favLeagueIds.has(l.id));
+    if (!targets.length && !amateurTargets.length && !hockeyTargets.length) {
       el.content.innerHTML = '<div class="empty">Markiere zuerst Teams als Favorit (★ auf einer Spielkarte), um sie hier gesammelt zu sehen.</div>';
       setUpdated();
       return;
@@ -376,6 +398,16 @@
           return games.length ? { lg, games, logos: data.logos } : null;
         } catch { return null; }
       }))).filter(Boolean);
+      // Eishockey (Hockeyweb): Spiele des gewählten Tages mit favorisierten Teams
+      const hockeyGroups = (await Promise.all(hockeyTargets.map(async (lg) => {
+        try {
+          const data = await hockeyGames(lg, day);
+          const games = (data.games || [])
+            .filter((g) => g.date === day && (isFav(amTeamId(g.home.name), lg.id) || isFav(amTeamId(g.away.name), lg.id)))
+            .sort(byTime);
+          return games.length ? { lg, games } : null;
+        } catch { return null; }
+      }))).filter(Boolean);
       if (id !== requestId) return;
       const items = [];
       results.forEach(({ lg, data }) => {
@@ -384,10 +416,11 @@
         });
       });
       renderGameList(items, '', 'Keine Spiele deiner Favoriten an diesem Tag.');
-      if (amateurGroups.length) {
-        const html = amateurGroups.map(({ lg, games, logos }) => `<h2 class="group-title">${esc(lg.name)} · Amateurfußball</h2><div class="games">${games.map((m) => amateurCard(m, lg.id, logos)).join('')}</div>`).join('');
-        if (!items.length) el.content.innerHTML = html;
-        else el.content.insertAdjacentHTML('beforeend', html);
+      const extra = amateurGroups.map(({ lg, games, logos }) => `<h2 class="group-title">${esc(lg.name)} · Amateurfußball</h2><div class="games">${games.map((m) => amateurCard(m, lg.id, logos)).join('')}</div>`).join('')
+        + hockeyGroups.map(({ lg, games }) => `<h2 class="group-title">${esc(lg.name)} · Eishockey</h2><div class="games">${games.map((g) => hockeyCard(g, lg)).join('')}</div>`).join('');
+      if (extra) {
+        if (!items.length) el.content.innerHTML = extra;
+        else el.content.insertAdjacentHTML('beforeend', extra);
       }
       setUpdated();
       clearTimeout(refreshTimer);
@@ -810,11 +843,189 @@
     return `<h2 class="group-title">${esc(fmtDayFor(state.date))}</h2><div class="games">${games.map((m) => amateurCard(m, lgId, data.logos)).join('')}</div>${note}`;
   }
 
+  // ---------- Eishockey (Hockeyweb.de über /api/hockey) ----------
+  // DEL, DEL2, Oberliga Süd/Nord, NL, ICEHL, CHL. Hockeyweb hat keine JSON-API; die Function liest die
+  // Seiten aus. Eine Anfrage liefert alle Spiele der Spielwoche zum Datum plus den Spielwochen-Kalender
+  // der Saison, mit dem die Tagesnavigation über Wochengrenzen springt.
+  const HOCKEY_TTL_MS = 60_000;
+  const hockeyCache = new Map(); // Query → { t, data }
+
+  async function hockeyFetch(params) {
+    const qs = new URLSearchParams(params).toString();
+    const hit = hockeyCache.get(qs);
+    if (hit && Date.now() - hit.t < HOCKEY_TTL_MS) return hit.data;
+    const res = await fetch(`/api/hockey?${qs}`);
+    if (!res.ok) {
+      let msg = `Fehler ${res.status}`;
+      try { msg = (await res.json()).error || msg; } catch { /* ignore */ }
+      throw new Error(msg);
+    }
+    const data = await res.json();
+    hockeyCache.set(qs, { t: Date.now(), data });
+    return data;
+  }
+  const hockeyGames = (lg, ymd) => hockeyFetch({ league: lg.hockey, type: 'games', date: ymd });
+  const hockeyStandings = (lg) => hockeyFetch({ league: lg.hockey, type: 'standings' });
+
+  // Vereinslogo vom Hockeyweb-Medienserver (Hotlink; nur diese Quelle ist erlaubt)
+  const hwLogo = (url) => (url && String(url).startsWith('https://media.hockeyweb.de/')
+    ? `<img src="${esc(url)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span></span>');
+
+  async function loadHockey({ silent = false } = {}) {
+    const id = ++requestId;
+    clearTimeout(refreshTimer);
+    if (!silent) { skeleton(state.tab === 'standings' ? 3 : 6); showStatus(''); }
+    const lg = currentLeague();
+    try {
+      if (state.tab === 'standings') {
+        const data = await hockeyStandings(lg);
+        if (id !== requestId) return;
+        el.content.innerHTML = hockeyTableHtml(lg, data);
+      } else {
+        const data = await hockeyGames(lg, toISODate(state.date));
+        if (id !== requestId) return;
+        el.content.innerHTML = hockeyDayHtml(lg, data);
+        scheduleHockeyRefresh(data);
+      }
+      setUpdated();
+    } catch (e) {
+      if (id !== requestId) return;
+      el.content.innerHTML = '';
+      showStatus(`Daten von Hockeyweb konnten nicht geladen werden: ${e.message}`, true);
+    }
+  }
+
+  // Heute laufende Spiele (Beginn bis 4 Std. her, noch nicht in den Ergebnissen): jede Minute neu laden.
+  function scheduleHockeyRefresh(data) {
+    clearTimeout(refreshTimer);
+    if (state.tab !== 'scores' || state.leagueId === FAV_ID) return;
+    const today = toISODate(todayAnchor());
+    if (toISODate(state.date) !== today) return;
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const running = (data.games || []).some((g) => {
+      if (g.date !== today || g.played || !g.time) return false;
+      const [h, m] = g.time.split(':').map(Number);
+      const diff = nowMin - (h * 60 + m);
+      return diff >= 0 && diff <= 240;
+    });
+    if (!running) return;
+    refreshTimer = setTimeout(() => {
+      if (!document.hidden) loadHockey({ silent: true });
+      else scheduleHockeyRefresh(data);
+    }, 60_000);
+  }
+
+  // Spielkarte im Stil der ESPN-Karten (Heim oben, Gast unten); lg liefert den Favoriten-Schlüssel.
+  function hockeyCard(g, lg) {
+    let status;
+    if (g.played) status = g.ot === 'PSO' ? 'Ende n.P.' : g.ot === 'OT' ? 'Ende n.V.' : 'Ende';
+    else status = g.time ? `${g.time} Uhr` : 'Zeit offen';
+    const homeId = amTeamId(g.home.name);
+    const awayId = amTeamId(g.away.name);
+    const row = (t, teamId, loser) => `
+        <div class="team-row${loser ? ' loser' : ''}">
+          <button class="star${isFav(teamId, lg.id) ? ' on' : ''}" data-fav="${esc(teamId)}" data-fav-league="${esc(lg.id)}" title="Favorit umschalten" aria-label="${esc(t.name)} als Favorit">★</button>
+          ${hwLogo(t.logo)}
+          <div class="team-name">${esc(t.name)}</div>
+          <div class="score">${g.played ? esc(t.score) : ''}</div>
+        </div>`;
+    const homeLoses = g.played && g.home.score < g.away.score;
+    const awayLoses = g.played && g.away.score < g.home.score;
+    const periods = g.played && g.periods?.length
+      ? `<div class="leaders">Drittel: ${g.periods.map(([a, b]) => `${esc(a)}:${esc(b)}`).join(' · ')}</div>` : '';
+    const fav = isFav(homeId, lg.id) || isFav(awayId, lg.id);
+    return `
+      <article class="game hockey${fav ? ' fav' : ''}">
+        <div class="game-status"><span>${esc(status)}</span></div>
+        ${row(g.home, homeId, homeLoses)}
+        ${row(g.away, awayId, awayLoses)}
+        ${periods}
+        <div class="game-meta"><span>${esc(lg.name)}</span><a href="${esc(g.url)}" target="_blank" rel="noopener">${g.played ? 'Spielbericht' : 'Spiel'} ↗</a></div>
+      </article>`;
+  }
+
+  // Spiele des gewählten Tages (state.date), Favoriten oben, sonst nach Uhrzeit
+  function hockeyDayHtml(lg, data) {
+    const day = toISODate(state.date);
+    const warn = (data.errors || []).length ? `<div class="empty small">Teilweise nicht verfügbar: ${esc(data.errors.join(' · '))}</div>` : '';
+    const games = (data.games || []).filter((g) => g.date === day).sort(byTime);
+    if (!games.length) return `${warn}<div class="empty">Keine Spiele an diesem Tag.</div>`;
+    const rank = (g) => (isFav(amTeamId(g.home.name), lg.id) || isFav(amTeamId(g.away.name), lg.id) ? 0 : 1);
+    games.sort((a, b) => rank(a) - rank(b));
+    return `${warn}<h2 class="group-title">${esc(fmtDayFor(state.date))} <a class="group-link" href="${esc(data.league.url)}" target="_blank" rel="noopener">Hockeyweb ↗</a></h2><div class="games">${games.map((g) => hockeyCard(g, lg)).join('')}</div>`;
+  }
+
+  // Playoff-/Playdown-Plätze laut Hinweistext auf Hockeyweb (Saison 2026/27): [von, bis, Farbe, Beschreibung].
+  // Für die übrigen Ligen nennt Hockeyweb keine festen Plätze, dort gibt es keine Markierung.
+  const HOCKEY_MARKS = {
+    del: [[1, 6, '#3ddc84', 'Direkt in die Playoffs'], [7, 10, '#f5b942', 'Pre-Playoffs'], [14, 14, '#ff6b6b', 'Playdowns gegen den DEL2-Meister']],
+    del2: [[1, 6, '#3ddc84', 'Direkt in die Playoffs'], [7, 10, '#f5b942', 'Pre-Playoffs'], [11, 14, '#ff6b6b', 'Playdowns']],
+  };
+
+  function hockeyTableHtml(lg, data) {
+    const marks = HOCKEY_MARKS[lg.hockey] || [];
+    return data.groups.map((g, i) => {
+      const used = new Map();
+      const rows = g.table.map((r) => {
+        const mk = marks.find(([from, to]) => r.rank >= from && r.rank <= to);
+        if (mk) used.set(mk[2], mk[3]);
+        return `<tr class="${isFav(amTeamId(r.team), lg.id) ? 'fav' : ''}">
+          <td>${mk ? `<span class="rank-mark" style="background:${mk[2]}"></span>` : ''}${esc(r.rank)}</td>
+          <td class="team-cell">${hwLogo(r.logo)}<span>${esc(r.team)}</span></td>
+          <td>${esc(r.played)}</td><td>${esc(r.won)}</td><td>${esc(r.otw)}</td><td>${esc(r.otl)}</td><td>${esc(r.lost)}</td>
+          <td>${esc(r.gf)}:${esc(r.ga)}</td><td>${esc(r.diff > 0 ? `+${r.diff}` : r.diff)}</td>
+          <td class="strong">${esc(r.points)}</td>
+        </tr>`;
+      }).join('');
+      const legend = [...used].map(([c, d]) => `<span><span class="rank-mark" style="background:${c}"></span>${esc(d)}</span>`).join('')
+        + '<span>OTS/OTN: Overtime-Siege/-Niederlagen</span>';
+      const title = g.name && !lg.name.endsWith(g.name) ? `${lg.name} · ${g.name}` : lg.name;
+      return `
+        <div class="standings-group">
+          <h2 class="group-title">${esc(title)}${i === 0 ? ` <a class="group-link" href="${esc(data.league.url)}" target="_blank" rel="noopener">Hockeyweb ↗</a>` : ''}</h2>
+          <div class="table-wrap"><table>
+            <thead><tr><th>#</th><th>Team</th><th>Sp</th><th>S</th><th>OTS</th><th>OTN</th><th>N</th><th>Tore</th><th>Diff</th><th>Pkt</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table></div>
+          <div class="legend">${legend}</div>
+        </div>`;
+    }).join('');
+  }
+
+  // Nächster/vorheriger Spieltag mit Spielen ab einem Datum (YYYY-MM-DD); springt bei Bedarf in die
+  // nächste/vorherige Spielwoche laut Kalender. null, wenn es keinen weiteren Spieltag gibt.
+  async function hockeyStep(lg, fromYmd, delta) {
+    const data = await hockeyGames(lg, fromYmd);
+    const days = data.days || [];
+    const near = delta > 0 ? days.find((d) => d > fromYmd) : [...days].reverse().find((d) => d < fromYmd);
+    if (near) return near;
+    const cal = data.calendar || [];
+    const wk = delta > 0 ? cal.find((w) => w.from > fromYmd) : [...cal].reverse().find((w) => w.to < fromYmd);
+    if (!wk) return null;
+    const probe = delta > 0 ? wk.from : wk.to;
+    const inWeek = ((await hockeyGames(lg, probe)).days || []).filter((d) => d >= wk.from && d <= wk.to);
+    return (delta > 0 ? inWeek[0] : inWeek[inWeek.length - 1]) || probe;
+  }
+
+  // Wie bei den ESPN-Ligen: ab heute zum nächsten Tag mit Spielen springen (heute selbst, falls dort
+  // gespielt wird); nach Saisonende zum letzten Spieltag.
+  async function snapHockey(lg) {
+    try {
+      const today = toISODate(todayAnchor());
+      const data = await hockeyGames(lg, today);
+      const day = (data.days || []).includes(today) ? today
+        : (await hockeyStep(lg, today, 1)) || (await hockeyStep(lg, today, -1));
+      if (day && currentLeague()?.id === lg.id) state.date = parseYMD(day);
+    } catch { /* Fehler zeigt loadHockey an */ }
+  }
+
   // ---------- Steuerung ----------
   function load() {
     renderTabs();
     renderDate();
     if (state.leagueId === FAV_ID) { loadFavoriteScores(); return; }
+    if (currentLeague().hockey) { loadHockey(); return; }
     if (currentLeague().amateur) { loadAmateur(); return; }
     if (state.tab === 'scores') loadScores();
     else if (state.tab === 'standings') loadStandings();
@@ -825,6 +1036,16 @@
     const lg = currentLeague();
     const plain = new Date(state.date);
     plain.setDate(plain.getDate() + delta);
+
+    if (lg.hockey) {
+      try {
+        const target = await hockeyStep(lg, toISODate(state.date), delta);
+        if (currentLeague()?.id !== lg.id) return;
+        if (target) state.date = parseYMD(target);
+      } catch { /* load() zeigt den Fehler */ }
+      load();
+      return;
+    }
 
     if (lg.amateur) {
       try {
@@ -889,10 +1110,16 @@
     state.date = todayAnchor();
     state.standingsConf = null;
     if (state.leagueId === FAV_ID) state.tab = 'scores';
-    if (currentLeague().amateur && state.tab === 'news') state.tab = 'scores';
+    if (isOwnSource(currentLeague()) && state.tab === 'news') state.tab = 'scores';
     persist();
     renderLeagueButtons();
     btn.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+    if (currentLeague().hockey) {
+      const hlg = currentLeague();
+      renderTabs(); renderDate(); skeleton(); showStatus('');
+      snapHockey(hlg).then(() => { if (currentLeague()?.id === hlg.id) load(); });
+      return;
+    }
     if (currentLeague().amateur) {
       const alg = currentLeague();
       renderTabs(); renderDate(); skeleton(); showStatus('');
@@ -964,6 +1191,7 @@
       if (favorites.has(key)) favorites.delete(key); else favorites.add(key);
       writeJSON(LS_FAV, [...favorites]);
       if (state.leagueId === FAV_ID) loadFavoriteScores({ silent: true });
+      else if (currentLeague().hockey) loadHockey({ silent: true });
       else if (currentLeague().amateur) loadAmateur({ silent: true });
       else loadScores({ silent: true });
       return;
@@ -1003,6 +1231,7 @@
   document.addEventListener('visibilitychange', () => {
     if (document.hidden || state.tab !== 'scores') return;
     if (currentLeague().amateur) return; // Fussball.de-Daten werden gecacht, kein Live-Refresh nötig
+    if (currentLeague().hockey) { loadHockey({ silent: true }); return; } // Hockeyweb: kurz gecacht
     if (state.leagueId === FAV_ID) loadFavoriteScores({ silent: true });
     else loadScores({ silent: true });
   });
@@ -1012,7 +1241,10 @@
   window.Profile.init({ api, esc });
   el.version.textContent = VERSION;
   renderLeagueButtons();
-  if (initialLeague.amateur) {
+  if (initialLeague.hockey) {
+    renderTabs(); renderDate(); skeleton();
+    snapHockey(initialLeague).then(() => { if (currentLeague()?.id === initialLeague.id) load(); });
+  } else if (initialLeague.amateur) {
     renderTabs(); renderDate(); skeleton();
     snapAmateur(initialLeague).then(() => { if (currentLeague()?.id === initialLeague.id) load(); });
   } else {

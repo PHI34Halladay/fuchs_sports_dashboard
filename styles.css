@@ -508,3 +508,6 @@ td.team-cell:not(.gc-link) span { white-space: normal; min-width: 150px; text-al
 .empty.small { padding: 16px; font-size: 12px; }
 table td.rank-1 { color: var(--live); font-weight: 700; }
 table td.rank-2 { color: var(--fav); font-weight: 700; }
+
+/* Eishockey (Hockeyweb) */
+.game.hockey .team-name { white-space: normal; overflow: visible; text-overflow: clip; }

@@ -19,6 +19,9 @@
   "functions": {
     "api/amateur.js": {
       "maxDuration": 30
+    },
+    "api/hockey.js": {
+      "maxDuration": 30
     }
   }
 }

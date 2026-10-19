@@ -5,7 +5,7 @@ Gehostet auf Vercel, Code auf GitHub – ohne Build-Schritt, ohne Abhängigkeite
 
 ## Funktionen
 
-- **Ligen:** NFL, NBA, MLB, NHL, NCAAF, NCAAM, Bundesliga, 2. Bundesliga, Premier League, La Liga, Ligue 1, Serie A, MLS, Champions League, Europa League, Conference League
+- **Ligen:** NFL, NBA, MLB, NHL, NCAAF, NCAAM, Bundesliga, 2. Bundesliga, Premier League, La Liga, Ligue 1, Serie A, MLS, Champions League, Europa League, Conference League sowie – über Hockeyweb – im Dropdown „🏒 Eishockey“: DEL, DEL2, Oberliga Süd, Oberliga Nord, NL (Schweiz), ICEHL, CHL
   (die zehn Fußball-Wettbewerbe sind in der Navigation unter einem „⚽ Fußball“-Dropdown zusammengefasst, damit die Leiste übersichtlich bleibt)
 - **★ Favoriten-Liga:** ganz vorne in der Liga-Leiste; zeigt die Spiele aller favorisierten Teams aus allen Ligen gemeinsam an einem Tag (nur Spiele-Ansicht, da ligaübergreifend – Tabelle/News ergeben hier keinen Sinn)
 - **Spiele:** Live-Stände (Auto-Refresh alle 30 s bei laufenden Spielen), Anstoßzeiten in Ortszeit, Bilanz, Top-Performer, TV-Sender, Link zum ESPN-Gamecast
@@ -81,6 +81,17 @@ vom Fussball.de-Logodienst (Hotlink).
 - **Neue Saison:** In `TEAMS` (`api/_fussballde.js`) `saison`, `staffelId` und ggf. `league` anpassen
   (Team-ID bleibt gleich, die Staffel-ID steht im Ajax-Link der Mannschaftsseite).
 - Ändert Fussball.de sein HTML, liefert die Function einen Fehler bzw. leere Listen – dann den Parser anpassen.
+
+## Eishockey (Hockeyweb)
+
+Das Dropdown „🏒 Eishockey“ in der Liga-Leiste enthält DEL, DEL2, Oberliga Süd, Oberliga Nord, NL (Swiss National League), ICEHL und CHL.
+Aufbau wie bei den ESPN-Ligen: Tab „Spiele“ (Tagesansicht mit Datumsnavigation, Sprung von Spieltag zu Spieltag, Drittelergebnisse, n.V./n.P.),
+Tab „Tabelle“ (DEL/DEL2 mit Playoff-/Playdown-Markierungen) und Favoriten-★ (auch in der ★-Liga). Kein News-Tab.
+
+- Hockeyweb hat keine JSON-API; `api/hockey.js` liest die HTML-Seiten (Ergebnisse, Spielplan, Tabelle) aus. `api/_hockeyweb.js` enthält Ligenkonfiguration und Parser (`npm test` prüft ihn).
+- Spiele kommen wochenweise (Spielwochen); die Function liefert zusätzlich den Spielwochen-Kalender der Saison.
+- Antworten werden kurz im Edge-Netz gecacht (Spiele 60 s, Tabellen 10 min). Es gibt keinen Live-Status – laufende Spiele erscheinen erst mit Ergebnis.
+- Ändert Hockeyweb sein HTML, liefert die Function einen Fehler bzw. leere Listen – dann den Parser anpassen.
 
 ## Deployment
 
