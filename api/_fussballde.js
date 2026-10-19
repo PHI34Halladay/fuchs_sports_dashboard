@@ -33,6 +33,14 @@ const TEAMS = {
   },
 };
 
+// Spielpläne beliebiger Mannschaften (für die Liga-Gesamtansicht)
+function teamUrls(teamId) {
+  return {
+    next: `${BASE}/ajax.team.matchplan/-/mode/PAGE/team-id/${teamId}`,
+    prev: `${BASE}/ajax.team.prev.games/-/mode/PAGE/team-id/${teamId}`,
+  };
+}
+
 function urlsFor(t) {
   return {
     page: `${BASE}/mannschaft/${t.slug}/-/saison/${t.saison}/team-id/${t.teamId}`,
@@ -75,6 +83,15 @@ const toInt = (s) => {
 };
 
 // ---------- Tabelle ----------
+// Logo-URL nur akzeptieren, wenn sie vom Fussball.de-Logodienst stammt.
+function logoUrl(row) {
+  const m = /<img\b[^>]*\bsrc="([^"]+)"/i.exec(row);
+  if (!m) return null;
+  const u = decode(m[1]);
+  const abs = u.startsWith('//') ? `https:${u}` : u;
+  return abs.startsWith('https://www.fussball.de/export.media/') ? abs : null;
+}
+
 function parseTable(html) {
   const out = [];
   for (const row of rowsOf(html)) {
@@ -98,6 +115,8 @@ function parseTable(html) {
       diff: toInt(s[5]),
       points: toInt(s[6]),
       own: /\bown\b/.test(classOf(row)),
+      teamId: ((/\/team-id\/([0-9A-Za-z]+)/.exec(row) || [])[1]) || null,
+      logo: logoUrl(row),
     });
   }
   return out;
@@ -198,4 +217,11 @@ function mergeMatches(...lists) {
   };
 }
 
-module.exports = { TEAMS, urlsFor, parseTable, parseMatches, mergeMatches, text };
+// Nur echte Ligaspiele: beide Mannschaften stehen in der Tabelle der Staffel
+// (blendet Pokal-/Freundschaftsspiele der anderen Teams aus).
+function leagueGames(list, table) {
+  const names = new Set(table.map((t) => t.team));
+  return names.size ? list.filter((m) => names.has(m.home) && names.has(m.away)) : list;
+}
+
+module.exports = { TEAMS, urlsFor, teamUrls, parseTable, parseMatches, mergeMatches, leagueGames, text };

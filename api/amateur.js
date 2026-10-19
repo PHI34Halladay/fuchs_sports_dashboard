@@ -1,11 +1,15 @@
-// Vercel Serverless Function: liest Tabelle und Spielplan einer Amateur-Mannschaft von Fussball.de.
+// Vercel Serverless Function: liest Tabelle und Spiele einer Amateur-Liga von Fussball.de.
 // Aufruf: /api/amateur?team=sgm1   (erlaubt: siehe TEAMS in _fussballde.js)
-// Antwort wird 15 Minuten im Edge-Netz gecacht, damit Fussball.de nur selten angefragt wird.
+//
+// Liefert die Tabelle (mit Vereinslogos) und ALLE Ligaspiele: dafür werden die Spielpläne
+// aller Mannschaften der Tabelle geladen und zusammengeführt. Antwort wird 30 Minuten im
+// Edge-Netz gecacht, damit Fussball.de nur selten angefragt wird.
 
-const { TEAMS, urlsFor, parseTable, parseMatches, mergeMatches } = require('./_fussballde');
+const { TEAMS, urlsFor, teamUrls, parseTable, parseMatches, mergeMatches, leagueGames } = require('./_fussballde');
 
-const UA = 'Mozilla/5.0 (compatible; sport-dashboard/1.8; privates Hobbyprojekt)';
-const TTL = 900;
+const UA = 'Mozilla/5.0 (compatible; sport-dashboard/1.10; privates Hobbyprojekt)';
+const TTL = 1800;
+const CONCURRENCY = 6;
 
 async function get(url) {
   const res = await fetch(url, {
@@ -14,6 +18,19 @@ async function get(url) {
   });
   if (!res.ok) throw new Error(`Fussball.de antwortet mit ${res.status}`);
   return res.text();
+}
+
+// Führt fn für alle Einträge aus, höchstens `limit` gleichzeitig (schont Fussball.de).
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let i = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (i < items.length) {
+      const idx = i++;
+      out[idx] = await fn(items[idx]);
+    }
+  }));
+  return out;
 }
 
 async function handler(req, res) {
@@ -25,23 +42,39 @@ async function handler(req, res) {
   }
 
   const u = urlsFor(team);
-  const [tableR, nextR, prevR] = await Promise.allSettled([get(u.table), get(u.next), get(u.prev)]);
   const errors = [];
 
   let table = [];
-  if (tableR.status === 'fulfilled') {
-    table = parseTable(tableR.value);
+  try {
+    table = parseTable(await get(u.table));
     if (!table.length) errors.push('Tabelle konnte nicht gelesen werden');
-  } else errors.push(`Tabelle: ${tableR.reason?.message || 'nicht erreichbar'}`);
+  } catch (e) {
+    errors.push(`Tabelle: ${e.message || 'nicht erreichbar'}`);
+  }
 
-  const lists = [];
-  if (nextR.status === 'fulfilled') lists.push(parseMatches(nextR.value, team.ownName));
-  else errors.push(`Spielplan: ${nextR.reason?.message || 'nicht erreichbar'}`);
-  if (prevR.status === 'fulfilled') lists.push(parseMatches(prevR.value, team.ownName, { forcePlayed: true }));
-  else errors.push(`Letzte Spiele: ${prevR.reason?.message || 'nicht erreichbar'}`);
-  const { upcoming, past } = mergeMatches(...lists);
+  // Spielpläne aller Mannschaften der Staffel; fällt auf die eigene Mannschaft zurück.
+  const ids = [...new Set(table.map((t) => t.teamId).filter(Boolean))];
+  if (!ids.includes(team.teamId)) ids.push(team.teamId);
 
-  if (!table.length && !upcoming.length && !past.length) {
+  let failed = 0;
+  const perTeam = await mapLimit(ids, CONCURRENCY, async (id) => {
+    const t = teamUrls(id);
+    const [n, p] = await Promise.allSettled([get(t.next), get(t.prev)]);
+    const lists = [];
+    if (n.status === 'fulfilled') lists.push(parseMatches(n.value, team.ownName));
+    else failed++;
+    if (p.status === 'fulfilled') lists.push(parseMatches(p.value, team.ownName, { forcePlayed: true }));
+    else failed++;
+    return lists;
+  });
+  if (failed) errors.push(`${failed} Spielplan-Abrufe fehlgeschlagen`);
+
+  const { upcoming, past } = mergeMatches(...perTeam.flat());
+  const logos = Object.fromEntries(table.filter((t) => t.logo).map((t) => [t.team, t.logo]));
+  const clean = (list) => leagueGames(list, table);
+
+  const out = { upcoming: clean(upcoming), past: clean(past) };
+  if (!table.length && !out.upcoming.length && !out.past.length) {
     res.status(502).json({ error: errors.join(' · ') || 'Fussball.de lieferte keine Daten' });
     return;
   }
@@ -50,8 +83,9 @@ async function handler(req, res) {
   res.status(200).json({
     team: { key, name: team.name, ownName: team.ownName, league: team.league, url: u.page },
     table,
-    upcoming,
-    past,
+    logos,
+    upcoming: out.upcoming,
+    past: out.past,
     errors,
     fetchedAt: new Date().toISOString(),
   });

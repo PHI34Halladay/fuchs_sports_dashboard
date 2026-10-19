@@ -2,16 +2,17 @@
 // Ausführen: npm test
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseTable, parseMatches, mergeMatches } = require('../api/_fussballde');
+const { parseTable, parseMatches, mergeMatches, leagueGames } = require('../api/_fussballde');
 
 const ZW = '​';
 const OWN = `SGM FC Gündelbach/${ZW}TSV Häfnerhaslach`;
 
-const tableRow = (cls, rank, name, nums) => `
+const LOGO = '//www.fussball.de/export.media/-/action/getLogo/format/0/id/LOGO1/verband/V1';
+const tableRow = (cls, rank, name, nums, { logo = LOGO, id = 'TEAM' + rank } = {}) => `
   <tr class="${cls}">
     <td class="column-icon"><span class="icon-arrow-up-right"></span></td>
     <td class="column-rank"> ${rank}. </td>
-    <td class="column-club"><a class="club-wrapper"><div class="club-logo table-image"><img src="x"></div>
+    <td class="column-club"><a class="club-wrapper" href="https://www.fussball.de/mannschaft/x/-/saison/2627/team-id/${id}"><div class="club-logo table-image"><img src="${logo}" alt=""></div>
       <div class="club-name"> ${name} </div></a></td>
     <td>${nums[0]}</td><td class="hidden-small">${nums[1]}</td><td class="hidden-small">${nums[2]}</td>
     <td class="hidden-small">${nums[3]}</td><td class="no-wrap">${nums[4]}</td>
@@ -22,16 +23,18 @@ const TABLE_HTML = `<table>
   <tr class="thead"><th>Platz</th><th class="column-large">Mannschaft</th><th>Spiele</th></tr>
   ${tableRow('row-promotion', 1, 'SGM Riexingen', [5, 4, 1, 0, '21 : 4', '17', 13])}
   ${tableRow('row-promotion-playoff odd own', 2, `SGM FC Gündelbach/${ZW}TSV Häfnerhaslach`, [5, 4, 1, 0, '15 : 7', '8', 13])}
-  ${tableRow('odd', 3, 'SV M&uuml;ller &amp; Co', [5, 0, 0, 5, '5 : 31', '-26', 0])}
+  ${tableRow('odd', 3, 'SV M&uuml;ller &amp; Co', [5, 0, 0, 5, '5 : 31', '-26', 0], { logo: 'https://evil.example/x.png' })}
 </table>`;
 
 test('Tabelle wird gelesen', () => {
   const t = parseTable(TABLE_HTML);
   assert.equal(t.length, 3);
-  assert.deepEqual(t[0], { rank: 1, team: 'SGM Riexingen', played: 5, won: 4, drawn: 1, lost: 0, gf: 21, ga: 4, diff: 17, points: 13, own: false });
+  assert.deepEqual(t[0], { rank: 1, team: 'SGM Riexingen', played: 5, won: 4, drawn: 1, lost: 0, gf: 21, ga: 4, diff: 17, points: 13, own: false, teamId: 'TEAM1', logo: 'https://www.fussball.de/export.media/-/action/getLogo/format/0/id/LOGO1/verband/V1' });
   assert.equal(t[1].team, 'SGM FC Gündelbach/TSV Häfnerhaslach'); // ohne Zero-Width-Space
   assert.equal(t[1].own, true);
   assert.equal(t[2].diff, -26);
+  assert.equal(t[2].logo, null); // fremde Logo-Hosts werden verworfen
+  assert.equal(t[2].teamId, 'TEAM3');
   assert.equal(t[2].team, 'SV Müller & Co'); // Entities dekodiert
 });
 
@@ -111,6 +114,13 @@ test('Zusammenführen: sortiert, dedupliziert', () => {
   const { upcoming, past } = mergeMatches(next, prev, next);
   assert.deepEqual(upcoming.map((g) => g.date), ['2026-10-25', '2026-11-05']);
   assert.deepEqual(past.map((g) => g.date), ['2026-10-18', '2026-10-11']);
+});
+
+test('Liga-Filter: nur Spiele, bei denen beide Teams in der Tabelle stehen', () => {
+  const table = [{ team: 'A' }, { team: 'B' }];
+  const g = (home, away) => ({ home, away });
+  assert.deepEqual(leagueGames([g('A', 'B'), g('A', 'Pokalgegner'), g('B', 'A')], table), [g('A', 'B'), g('B', 'A')]);
+  assert.equal(leagueGames([g('X', 'Y')], []).length, 1); // ohne Tabelle nicht alles wegfiltern
 });
 
 test('Leere/kaputte Eingaben führen nicht zu Fehlern', () => {
