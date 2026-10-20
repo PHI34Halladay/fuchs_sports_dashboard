@@ -51,13 +51,15 @@ test('computeTable: 3-2-1-0 Punkte', () => {
 
 test('mapTable: erkennt Feldnamen, sonst null', () => {
   const ok = { table: { tableTeamIds: [6, 1], teams: SCHEDULE.schedule.teams, table: [
-    { teamId: 1, games: 10, wins: 5, lossesOT: 1, losses: 4, goalsPlus: 30, goalsMinus: 25, points: 20 },
-    { teamId: 6, games: 10, wins: 7, losses: 3, goalsPlus: 35, goalsMinus: 20, points: 22 },
+    { teamId: 1, matches: 10, wins: 5, winsOT: 1, winsPSO: 1, lossesOT: 1, lossesPSO: 0, losses: 2, goals: 30, goalsReceived: 25, points: 20 },
+    { teamId: 6, matches: 10, wins: 7, losses: 3, goals: 35, goalsReceived: 20, points: 22 },
   ] } };
   const g = app.mapTable(ok, 'DEL')[0].table;
   assert.equal(g[0].team, 'Kölner Haie');
   assert.equal(g[0].rank, 1);
   assert.equal(g[1].diff, 5);
+  assert.equal(g[1].otw, 2);
+  assert.equal(g[1].otl, 1);
   assert.equal(app.mapTable({ table: { table: [{ teamId: 1, foo: 1 }] } }, 'DEL'), null);
 });
 

@@ -99,14 +99,14 @@ function mapTable(payload, groupName) {
   if (!rows.length) return null;
   const out = rows.map((r, i) => {
     const teamId = Number(r.teamId ?? r.id);
-    const played = pick(r, ['games', 'gamesPlayed', 'played', 'matches', 'gp', 'sp']);
+    const played = pick(r, ['matches', 'games', 'gamesPlayed', 'played', 'gp', 'sp']);
     const points = pick(r, ['points', 'pts', 'score']);
     const won = pick(r, ['wins', 'won', 'win', 'w']);
     const lost = pick(r, ['losses', 'lost', 'loss', 'l']);
-    const gf = pick(r, ['goalsFor', 'goalsPlus', 'goalsScored', 'goalsHome', 'gf', 'goals', 'scored']);
-    const ga = pick(r, ['goalsAgainst', 'goalsMinus', 'goalsConceded', 'goalsAway', 'ga', 'conceded']);
-    const otw = pick(r, ['winsOT', 'overtimeWins', 'otWins', 'otw', 'winsOvertime', 'winsOTSO']) ?? 0;
-    const otl = pick(r, ['lossesOT', 'overtimeLosses', 'otLosses', 'otl', 'lossesOvertime', 'lossesOTSO']) ?? 0;
+    const gf = pick(r, ['goals', 'goalsFor', 'goalsPlus', 'goalsScored', 'gf', 'scored']);
+    const ga = pick(r, ['goalsReceived', 'goalsAgainst', 'goalsMinus', 'goalsConceded', 'ga', 'conceded']);
+    const otw = (pick(r, ['winsOT']) ?? 0) + (pick(r, ['winsPSO']) ?? 0);
+    const otl = (pick(r, ['lossesOT']) ?? 0) + (pick(r, ['lossesPSO']) ?? 0);
     const rank = pick(r, ['place', 'rank', 'position', 'pos']) ?? (order.length ? order.indexOf(teamId) + 1 || i + 1 : i + 1);
     return { rank, team: names.get(teamId) || r.teamName || `Team ${teamId}`, logo: null, played, won, otw, otl, lost, gf, ga, diff: gf != null && ga != null ? gf - ga : 0, points };
   });
