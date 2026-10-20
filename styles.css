@@ -81,24 +81,35 @@ kbd { font-family: var(--font); font-size: 11px; padding: 1px 6px; border-radius
 
 /* Ligaleiste */
 .leaguebar {
-  display: flex; gap: 18px; align-items: center; overflow-x: auto; scrollbar-width: none;
+  display: flex; gap: 8px; align-items: center; overflow-x: auto; scrollbar-width: none;
   padding: 8px 18px 10px; max-width: 1320px; margin: 0 auto;
 }
 .leaguebar::-webkit-scrollbar { display: none; }
-.lg-group { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.lg-group + .lg-group { padding-left: 18px; border-left: 1px solid var(--border); }
-.lg-group-label { font-size: 10px; font-weight: 700; letter-spacing: .9px; text-transform: uppercase; color: var(--muted); margin-right: 2px; }
 .lg-chip {
   --lg: #888;
-  display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 5px 13px 5px 10px;
+  position: relative; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; flex-shrink: 0;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 14px 4px 5px;
   font-family: var(--display); font-size: 16px; font-weight: 600; letter-spacing: .3px; color: #c7cfd9;
-  transition: all .15s;
+  transition: background .15s, border-color .15s, color .15s;
 }
-.lg-chip::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--lg); box-shadow: 0 0 8px color-mix(in srgb, var(--lg) 70%, transparent); }
-.lg-chip:hover { color: var(--text); border-color: color-mix(in srgb, var(--lg) 60%, transparent); }
-.lg-chip.active { background: color-mix(in srgb, var(--lg) 85%, #000); border-color: var(--lg); color: #fff; }
-.lg-chip.active::before { background: #fff; box-shadow: none; }
+.lg-chip:hover { color: var(--text); border-color: color-mix(in srgb, var(--lg) 55%, transparent); }
+.lg-chip.active { background: color-mix(in srgb, var(--lg) 30%, var(--surface)); border-color: color-mix(in srgb, var(--lg) 80%, transparent); color: #fff; }
+.lg-logo { width: 26px; height: 26px; border-radius: 50%; object-fit: contain; background: rgba(255, 255, 255, .06); padding: 3px; flex-shrink: 0; }
+.lg-abbr {
+  display: inline-flex; align-items: center; justify-content: center; padding: 0;
+  background: color-mix(in srgb, var(--lg) 70%, #000); color: #fff;
+  font-family: var(--font); font-size: 8.5px; font-weight: 800; letter-spacing: 0; line-height: 1; text-align: center;
+}
+.lg-chip.has-live { border-color: color-mix(in srgb, var(--live) 70%, transparent); }
+.lg-live, .sport-live {
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; font-family: var(--font); font-size: 10.5px; font-weight: 800;
+  background: var(--live); color: #fff; display: inline-flex; align-items: center; justify-content: center; gap: 3px; letter-spacing: 0;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--live) 60%, transparent);
+}
+.lg-live::before, .sport-live::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: #fff; animation: pulse 1.2s infinite; }
+.sport-btn.has-live { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--live) 75%, transparent); }
+.sport-btn.active.has-live { box-shadow: inset 0 0 0 1.5px var(--live); }
+.hero-abbr { font-family: var(--font); font-size: 15px; font-weight: 800; color: #fff; }
 .lg-info { display: flex; gap: 16px; align-items: center; font-size: 13px; color: #c7cfd9; white-space: nowrap; }
 
 /* ---------- Layout ---------- */
@@ -180,32 +191,33 @@ kbd { font-family: var(--font); font-size: 11px; padding: 1px 6px; border-radius
 .group-link:hover { color: var(--text); }
 .games { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
 
-/* Spielkarte: Diagonaler Farbverlauf Heim (links oben) → Gast (rechts unten), neutraler Balken in der Mitte */
+/* Spielkarte: weicher diagonaler Verlauf Heim (links oben) → Gast (rechts unten), neutrale Mitte */
 .mc {
   --c-home: #3a404c;
   --c-away: #3a404c;
+  --card-base: #15181f;
   position: relative; isolation: isolate; overflow: hidden;
   border-radius: 18px; padding: 10px 12px 10px;
   display: flex; flex-direction: column; gap: 6px;
   background: linear-gradient(135deg,
-    color-mix(in srgb, var(--c-home) 82%, #000) 0%,
-    color-mix(in srgb, var(--c-home) 46%, #0b0d12) 45%,
-    var(--neutral-band) 45.3%, var(--neutral-band) 54.7%,
-    color-mix(in srgb, var(--c-away) 46%, #0b0d12) 55%,
-    color-mix(in srgb, var(--c-away) 82%, #000) 100%);
-  border: 1px solid rgba(255, 255, 255, .09);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .06);
-  transition: transform .15s, box-shadow .15s, border-color .15s;
+    color-mix(in srgb, var(--c-home) 48%, var(--card-base)) 0%,
+    color-mix(in srgb, var(--c-home) 26%, var(--card-base)) 26%,
+    color-mix(in srgb, var(--c-home) 7%, var(--card-base)) 44%,
+    var(--card-base) 50%,
+    color-mix(in srgb, var(--c-away) 7%, var(--card-base)) 56%,
+    color-mix(in srgb, var(--c-away) 26%, var(--card-base)) 74%,
+    color-mix(in srgb, var(--c-away) 48%, var(--card-base)) 100%);
+  border: 1px solid rgba(255, 255, 255, .07);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .3), inset 0 1px 0 rgba(255, 255, 255, .05);
+  transition: transform .15s, box-shadow .15s;
 }
-/* feine Kanten des neutralen Balkens + leichter Glanz */
+/* leichter Glanz oben */
 .mc::before {
   content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  background:
-    linear-gradient(135deg, transparent 45%, rgba(255, 255, 255, .10) 45.2%, transparent 45.6%, transparent 54.4%, rgba(255, 255, 255, .10) 54.8%, transparent 55%),
-    radial-gradient(120% 80% at 50% 0%, rgba(255, 255, 255, .07), transparent 60%);
+  background: radial-gradient(120% 70% at 50% 0%, rgba(255, 255, 255, .05), transparent 60%);
 }
 .mc.clickable { cursor: pointer; }
-.mc.clickable:hover { transform: translateY(-2px); box-shadow: 0 16px 34px rgba(0, 0, 0, .45); border-color: rgba(255, 255, 255, .2); }
+.mc.clickable:hover { transform: translateY(-2px); box-shadow: 0 16px 34px rgba(0, 0, 0, .45); }
 .mc:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 .mc.fav { border-color: color-mix(in srgb, var(--fav) 70%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--fav) 45%, transparent), 0 10px 28px rgba(0, 0, 0, .35); }
 .mc.live { border-color: color-mix(in srgb, var(--live) 75%, transparent); animation: liveGlow 2.4s ease-in-out infinite; }
@@ -386,9 +398,10 @@ dialog.search::backdrop { background: rgba(0, 0, 0, .6); backdrop-filter: blur(4
   .sport-icon { font-size: 20px; }
   .sport-btn.active { background: color-mix(in srgb, var(--accent) 20%, transparent); box-shadow: none; }
   .sport-badge { position: absolute; top: 2px; right: calc(50% - 22px); }
+  .sport-live { position: absolute; top: 1px; left: calc(50% + 6px); height: 16px; min-width: 16px; font-size: 9.5px; padding: 0 4px; }
+  .sport-live::before { display: none; }
   .search-trigger { width: 38px; height: 38px; justify-content: center; padding: 0; }
-  .leaguebar { padding: 6px 12px 9px; gap: 12px; }
-  .lg-group + .lg-group { padding-left: 12px; }
+  .leaguebar { padding: 6px 12px 9px; gap: 6px; }
   .container { padding: 12px 12px calc(20px + var(--bottom-nav)); }
   .hero { padding: 14px; border-radius: 16px; }
   .hero-name { font-size: 26px; }
@@ -428,9 +441,9 @@ dialog.gc::backdrop { background: rgba(0, 0, 0, .7); backdrop-filter: blur(4px);
   --c-home: #2a2f38; --c-away: #2a2f38;
   padding: 22px 20px 14px;
   background: linear-gradient(135deg,
-    color-mix(in srgb, var(--c-home) 75%, #000) 0%, color-mix(in srgb, var(--c-home) 35%, #0b0d12) 44%,
-    var(--neutral-band) 44.3%, var(--neutral-band) 55.7%,
-    color-mix(in srgb, var(--c-away) 35%, #0b0d12) 56%, color-mix(in srgb, var(--c-away) 75%, #000) 100%);
+    color-mix(in srgb, var(--c-home) 50%, #12151b) 0%, color-mix(in srgb, var(--c-home) 22%, #12151b) 30%,
+    #12151b 50%,
+    color-mix(in srgb, var(--c-away) 22%, #12151b) 70%, color-mix(in srgb, var(--c-away) 50%, #12151b) 100%);
   border-bottom: 1px solid var(--border);
 }
 .gc-score { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; }
@@ -746,16 +759,10 @@ dialog.gc::backdrop { background: rgba(0, 0, 0, .7); backdrop-filter: blur(4px);
 }
 
 /* ---------- Klickbare Spieler/Teams ---------- */
-.gc-link { cursor: pointer; border-radius: 6px; transition: background-color .15s, color .15s; }
-.gc-link:hover { background: rgba(255, 255, 255, .08); color: var(--text); }
+/* Kein grauer Kasten beim Überfahren – nur der Mauszeiger zeigt, dass es klickbar ist */
+.gc-link { cursor: pointer; }
 button.gc-link { background: none; border: 0; padding: 0; font: inherit; text-align: inherit; color: inherit; display: inherit; }
-.gc-team.gc-link:hover { background: rgba(255, 255, 255, .08); }
-.gc-sec-team.gc-link:hover, .gc-leaders-team.gc-link:hover, .gc-box-group.gc-link:hover { background: rgba(255, 255, 255, .08); padding: 2px 6px; margin: -2px -6px; }
-.team-link.gc-link:hover span { text-decoration: underline; }
-img.gc-link:hover { filter: brightness(1.2); background: none; }
-.mc-name.gc-link:hover { text-decoration: underline; background: none; }
-.mc-logo img.gc-link:hover { background: none; }
-.mc-extra .gc-link:hover { background: none; text-decoration: underline; }
+img.gc-link:hover { filter: brightness(1.12); }
 
 /* ---------- Profil-Popup (Spieler/Team) ---------- */
 dialog.pf {
@@ -838,3 +845,15 @@ dialog.pf::backdrop { background: rgba(0, 0, 0, .7); backdrop-filter: blur(4px);
 }
 .mc.own .mc-name, .mc:not(.clickable) .mc-name { -webkit-line-clamp: 3; }
 .mc-logo img[src=""], .mc-logo img:not([src]) { visibility: hidden; }
+
+/* Boxscore: Team-Umschalter */
+.box-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; margin-bottom: 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); position: sticky; top: 46px; z-index: 1; }
+.box-sw {
+  --tc: #888;
+  display: flex; align-items: center; justify-content: center; gap: 8px; min-width: 0;
+  padding: 8px 10px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); font-weight: 700; font-size: 14px;
+}
+.box-sw img { width: 24px; height: 24px; object-fit: contain; flex-shrink: 0; }
+.box-sw span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.box-sw:hover { color: var(--text); }
+.box-sw.active { color: #fff; background: linear-gradient(135deg, color-mix(in srgb, var(--tc) 45%, var(--surface-2)), color-mix(in srgb, var(--tc) 15%, var(--surface-2))); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tc) 60%, transparent); }

@@ -25,34 +25,34 @@
   const LEAGUES = [
     { id: FAV_ID, name: 'Favoriten', cat: 'fav', isFav: true, color: '#f5c542' },
 
-    { id: 'bl1', name: 'Bundesliga', cat: 'soccer', group: 'Deutschland', sport: 'soccer', league: 'ger.1', color: '#e2001a' },
-    { id: 'bl2', name: '2. Bundesliga', cat: 'soccer', group: 'Deutschland', sport: 'soccer', league: 'ger.2', color: '#ff3b4a' },
-    { id: 'kreis', name: 'Kreisliga', cat: 'soccer', group: 'Deutschland', amateur: true, teams: ['sgm1', 'sgm2'], color: '#2fbf71' },
-    { id: 'ucl', name: 'Champions League', cat: 'soccer', group: 'Europapokal', sport: 'soccer', league: 'uefa.champions', color: '#3c7bff' },
-    { id: 'uel', name: 'Europa League', cat: 'soccer', group: 'Europapokal', sport: 'soccer', league: 'uefa.europa', color: '#ff7a00' },
-    { id: 'uecl', name: 'Conference League', cat: 'soccer', group: 'Europapokal', sport: 'soccer', league: 'uefa.europa.conf', color: '#22c979' },
-    { id: 'epl', name: 'Premier League', cat: 'soccer', group: 'Topligen', sport: 'soccer', league: 'eng.1', color: '#a35cff' },
-    { id: 'laliga', name: 'La Liga', cat: 'soccer', group: 'Topligen', sport: 'soccer', league: 'esp.1', color: '#ff4b44' },
-    { id: 'seriea', name: 'Serie A', cat: 'soccer', group: 'Topligen', sport: 'soccer', league: 'ita.1', color: '#1e9bff' },
-    { id: 'ligue1', name: 'Ligue 1', cat: 'soccer', group: 'Topligen', sport: 'soccer', league: 'fra.1', color: '#cddc39' },
-    { id: 'mls', name: 'MLS', cat: 'soccer', group: 'Amerika', sport: 'soccer', league: 'usa.1', color: '#5a8dee' },
+    { id: 'bl1', abbr: 'BL', name: 'Bundesliga', cat: 'soccer', group: 'Deutschland', sport: 'soccer', league: 'ger.1', color: '#e2001a' },
+    { id: 'bl2', abbr: '2.BL', name: '2. Bundesliga', cat: 'soccer', group: 'Deutschland', sport: 'soccer', league: 'ger.2', color: '#ff3b4a' },
+    { id: 'kreis', abbr: 'KL', name: 'Kreisliga', cat: 'soccer', group: 'Deutschland', amateur: true, teams: ['sgm1', 'sgm2'], color: '#2fbf71' },
+    { id: 'ucl', abbr: 'UCL', name: 'Champions League', cat: 'soccer', group: 'Europapokal', sport: 'soccer', league: 'uefa.champions', color: '#3c7bff' },
+    { id: 'uel', abbr: 'UEL', name: 'Europa League', cat: 'soccer', group: 'Europapokal', sport: 'soccer', league: 'uefa.europa', color: '#ff7a00' },
+    { id: 'uecl', abbr: 'UECL', name: 'Conference League', cat: 'soccer', group: 'Europapokal', sport: 'soccer', league: 'uefa.europa.conf', color: '#22c979' },
+    { id: 'epl', abbr: 'PL', name: 'Premier League', cat: 'soccer', group: 'Topligen', sport: 'soccer', league: 'eng.1', color: '#a35cff' },
+    { id: 'laliga', abbr: 'LL', name: 'La Liga', cat: 'soccer', group: 'Topligen', sport: 'soccer', league: 'esp.1', color: '#ff4b44' },
+    { id: 'seriea', abbr: 'SA', name: 'Serie A', cat: 'soccer', group: 'Topligen', sport: 'soccer', league: 'ita.1', color: '#1e9bff' },
+    { id: 'ligue1', abbr: 'L1', name: 'Ligue 1', cat: 'soccer', group: 'Topligen', sport: 'soccer', league: 'fra.1', color: '#cddc39' },
+    { id: 'mls', abbr: 'MLS', name: 'MLS', cat: 'soccer', group: 'Amerika', sport: 'soccer', league: 'usa.1', color: '#5a8dee' },
 
-    { id: 'nfl', name: 'NFL', cat: 'football', group: 'Profis', sport: 'football', league: 'nfl', color: '#3a7bec' },
-    { id: 'cfb', name: 'NCAAF', cat: 'football', group: 'College', sport: 'football', league: 'college-football', groups: '80', color: '#e0483e' },
+    { id: 'nfl', abbr: 'NFL', name: 'NFL', cat: 'football', group: 'Profis', sport: 'football', league: 'nfl', color: '#3a7bec' },
+    { id: 'cfb', abbr: 'CFB', name: 'NCAAF', cat: 'football', group: 'College', sport: 'football', league: 'college-football', groups: '80', color: '#e0483e' },
 
-    { id: 'nba', name: 'NBA', cat: 'basketball', group: 'Profis', sport: 'basketball', league: 'nba', color: '#f0484e' },
-    { id: 'cbb', name: 'NCAAM', cat: 'basketball', group: 'College', sport: 'basketball', league: 'mens-college-basketball', groups: '50', color: '#ff9f1a' },
+    { id: 'nba', abbr: 'NBA', name: 'NBA', cat: 'basketball', group: 'Profis', sport: 'basketball', league: 'nba', color: '#f0484e' },
+    { id: 'cbb', abbr: 'CBB', name: 'NCAAM', cat: 'basketball', group: 'College', sport: 'basketball', league: 'mens-college-basketball', groups: '50', color: '#ff9f1a' },
 
-    { id: 'nhl', name: 'NHL', cat: 'hockey', group: 'Nordamerika', sport: 'hockey', league: 'nhl', color: '#b4c0cc' },
-    { id: 'del', name: 'DEL', cat: 'hockey', group: 'Deutschland', hockey: 'del', color: '#2f8cff' },
-    { id: 'del2', name: 'DEL2', cat: 'hockey', group: 'Deutschland', hockey: 'del2', color: '#22b8e8' },
-    { id: 'obs', name: 'Oberliga Süd', cat: 'hockey', group: 'Deutschland', hockey: 'obs', color: '#7ea6ff' },
-    { id: 'obn', name: 'Oberliga Nord', cat: 'hockey', group: 'Deutschland', hockey: 'obn', color: '#7ea6ff' },
-    { id: 'nl', name: 'NL (Schweiz)', cat: 'hockey', group: 'Europa', hockey: 'nl', color: '#ff3b3b' },
-    { id: 'icehl', name: 'ICEHL', cat: 'hockey', group: 'Europa', hockey: 'icehl', color: '#ff6b6b' },
-    { id: 'chl', name: 'CHL', cat: 'hockey', group: 'Europa', hockey: 'chl', color: '#ffb000' },
+    { id: 'nhl', abbr: 'NHL', name: 'NHL', cat: 'hockey', group: 'Nordamerika', sport: 'hockey', league: 'nhl', color: '#b4c0cc' },
+    { id: 'del', abbr: 'DEL', name: 'DEL', cat: 'hockey', group: 'Deutschland', hockey: 'del', color: '#2f8cff' },
+    { id: 'del2', abbr: 'DEL2', name: 'DEL2', cat: 'hockey', group: 'Deutschland', hockey: 'del2', color: '#22b8e8' },
+    { id: 'obs', abbr: 'OL S', name: 'Oberliga Süd', cat: 'hockey', group: 'Deutschland', hockey: 'obs', color: '#7ea6ff' },
+    { id: 'obn', abbr: 'OL N', name: 'Oberliga Nord', cat: 'hockey', group: 'Deutschland', hockey: 'obn', color: '#7ea6ff' },
+    { id: 'nl', abbr: 'NL', name: 'NL (Schweiz)', cat: 'hockey', group: 'Europa', hockey: 'nl', color: '#ff3b3b' },
+    { id: 'icehl', abbr: 'ICE', name: 'ICEHL', cat: 'hockey', group: 'Europa', hockey: 'icehl', color: '#ff6b6b' },
+    { id: 'chl', abbr: 'CHL', name: 'CHL', cat: 'hockey', group: 'Europa', hockey: 'chl', color: '#ffb000' },
 
-    { id: 'mlb', name: 'MLB', cat: 'baseball', group: 'Profis', sport: 'baseball', league: 'mlb', color: '#4a83e8' },
+    { id: 'mlb', abbr: 'MLB', name: 'MLB', cat: 'baseball', group: 'Profis', sport: 'baseball', league: 'mlb', color: '#4a83e8' },
   ];
   const DEFAULT_LEAGUE = { fav: FAV_ID, soccer: 'bl1', football: 'nfl', basketball: 'nba', hockey: 'nhl', baseball: 'mlb' };
   const AMATEUR_LABEL = { sgm1: 'SGM I', sgm2: 'SGM II' };
@@ -84,7 +84,7 @@
   const state = {
     leagueId: initialLeagueId,
     tab: initialLeagueId === FAV_ID ? 'scores' : (['scores', 'standings', 'news'].includes(saved.tab) && !(isOwnSource(initialLeague) && saved.tab === 'news') ? saved.tab : 'scores'),
-    date: todayAnchor(),
+    date: defaultAnchor(initialLeague),
     top25Only: !!saved.top25Only,
     standingsConf: null, // Tabellen-Ansicht bei NCAAF/NCAAM: 'top25' oder ein Conference-Name
     autoReload: !!saved.autoReload,
@@ -116,6 +116,18 @@
     const d = new Date();
     d.setHours(12, 0, 0, 0);
     return d;
+  }
+  // US-Ligen: Die Spiele der Nacht laufen in deutscher Zeit nach Mitternacht – bis 10 Uhr
+  // morgens gilt daher noch der Vortag als "aktueller" Spieltag. Europäische Ligen: Kalendertag.
+  function defaultAnchor(lg) {
+    const d = todayAnchor();
+    if (lg && US_LEAGUE_IDS.has(lg.id) && new Date().getHours() < 10) d.setDate(d.getDate() - 1);
+    return d;
+  }
+  // ESPN-Abfragetag einer Liga für ein Datum der Favoriten-Ansicht ("heute" vor 10 Uhr → US-Vortag)
+  function espnDayFor(lg, d) {
+    const base = (ymdOf(d) === ymdOf(todayAnchor())) ? defaultAnchor(lg) : d;
+    return ymdInTZ(base, leagueTZ(lg));
   }
 
   // ---------- DOM ----------
@@ -255,7 +267,7 @@
   // Beim Liga-Wechsel: von heute aus vorwärts zum nächsten Tag mit Spiel springen.
   async function snapToGameDay(lg) {
     if (!isEspn(lg)) return;
-    let d = todayAnchor();
+    let d = defaultAnchor(lg);
     for (let i = 0; i < 60; i++) {
       const days = await gameDaySet(lg, d);
       if (!days || !days.size) return;
@@ -281,13 +293,58 @@
     return res.json();
   }
 
+  const pickLeagueLogo = (L) => (L?.logos || []).find((x) => (x.rel || []).includes('dark'))?.href || L?.logos?.[0]?.href || '';
   function rememberLeagueMeta(lg, data) {
     const L = data?.leagues?.[0];
     if (!L || leagueMeta.has(lg.id)) return;
-    const logo = (L.logos || []).find((x) => (x.rel || []).includes('dark'))?.href || L.logos?.[0]?.href || '';
-    leagueMeta.set(lg.id, { logo, season: L.season?.displayName || '' });
+    leagueMeta.set(lg.id, { logo: pickLeagueLogo(L), season: L.season?.displayName || '' });
     if (currentLeague()?.id === lg.id) renderHero();
   }
+
+  // ---------- Liga-Logos ----------
+  // Eigene Logos (lg.logo, z. B. 'logos/kreisliga.png') haben Vorrang; sonst ESPN-Ligalogo aus dem
+  // Scoreboard (einmal abgefragt mit einem alten Datum = kleine Antwort ohne Spiele, 30 Tage gespeichert).
+  const LS_LOGOS = 'sd:leaguelogos';
+  const logoStore = readJSON(LS_LOGOS, { t: 0, map: {} });
+  const logoFresh = Date.now() - (logoStore.t || 0) < 30 * 864e5;
+  const leagueLogos = logoFresh ? (logoStore.map || {}) : {};
+  const leagueLogoUrl = (lg) => lg?.logo || leagueLogos[lg?.id] || '';
+  function leagueBadge(lg, cls = 'lg-logo') {
+    const url = leagueLogoUrl(lg);
+    if (url) return `<img class="${cls}" src="${esc(url)}" alt="" loading="lazy">`;
+    return `<span class="${cls} lg-abbr" style="--lg:${lg.color}">${esc(lg.abbr || lg.name.slice(0, 3))}</span>`;
+  }
+  async function loadLeagueLogos() {
+    const missing = LEAGUES.filter((l) => isEspn(l) && !l.logo && !leagueLogos[l.id]);
+    if (!missing.length) return;
+    await Promise.all(missing.map(async (lg) => {
+      try {
+        const data = await api('scoreboard', { dates: '19990101' }, lg);
+        const url = pickLeagueLogo(data?.leagues?.[0]);
+        if (url) leagueLogos[lg.id] = url;
+      } catch { /* kein Logo */ }
+    }));
+    writeJSON(LS_LOGOS, { t: logoFresh ? logoStore.t : Date.now(), map: leagueLogos });
+    renderLeaguebar();
+    renderHero();
+  }
+
+  // ---------- Live-Zähler je Liga/Sportart ----------
+  // /api/live zählt serverseitig die laufenden Spiele aller ESPN-Ligen (nur Zahlen, kleine Antwort).
+  let liveCounts = {};
+  let liveTimer = null;
+  async function pollLive() {
+    clearTimeout(liveTimer);
+    if (!document.hidden) {
+      const spec = LEAGUES.filter(isEspn).map((lg) => `${lg.id}:${ymdInTZ(defaultAnchor(lg), leagueTZ(lg))}`).join(',');
+      try {
+        const res = await fetch(`/api/live?l=${encodeURIComponent(spec)}`);
+        if (res.ok) { liveCounts = (await res.json()).live || {}; renderSports(); renderLeaguebar(); }
+      } catch { /* nächster Versuch */ }
+    }
+    liveTimer = setTimeout(pollLive, 60_000);
+  }
+  const liveIn = (pred) => LEAGUES.filter(pred).reduce((n, l) => n + (+liveCounts[l.id] || 0), 0);
 
   function showStatus(text, isError = false) {
     el.status.hidden = !text;
@@ -306,8 +363,10 @@
     const cat = currentLeague().cat;
     el.sports.innerHTML = SPORTS.map((s) => {
       const badge = s.id === 'fav' && pins.length ? `<span class="sport-badge">${pins.length}</span>` : '';
-      return `<button type="button" class="sport-btn${s.id === cat ? ' active' : ''}${s.id === 'fav' ? ' sport-fav' : ''}" data-sport="${s.id}" aria-pressed="${s.id === cat}">
-        <span class="sport-icon" aria-hidden="true">${s.icon}</span><span class="sport-label">${esc(s.label)}</span>${badge}
+      const live = s.id === 'fav' ? 0 : liveIn((l) => l.cat === s.id);
+      const liveBadge = live ? `<span class="sport-live" title="${live} Spiel${live === 1 ? '' : 'e'} live">${live}</span>` : '';
+      return `<button type="button" class="sport-btn${s.id === cat ? ' active' : ''}${s.id === 'fav' ? ' sport-fav' : ''}${live ? ' has-live' : ''}" data-sport="${s.id}" aria-pressed="${s.id === cat}">
+        <span class="sport-icon" aria-hidden="true">${s.icon}</span><span class="sport-label">${esc(s.label)}</span>${badge}${liveBadge}
       </button>`;
     }).join('');
   }
@@ -320,17 +379,12 @@
       return;
     }
     const members = LEAGUES.filter((l) => l.cat === lg.cat);
-    const groups = [];
-    members.forEach((l) => {
-      let g = groups.find((x) => x.name === l.group);
-      if (!g) { g = { name: l.group, items: [] }; groups.push(g); }
-      g.items.push(l);
-    });
-    el.leaguebar.innerHTML = groups.map((g) => `
-      <div class="lg-group">
-        ${groups.length > 1 ? `<span class="lg-group-label">${esc(g.name || '')}</span>` : ''}
-        ${g.items.map((l) => `<button type="button" class="lg-chip${l.id === lg.id ? ' active' : ''}" data-league="${l.id}" style="--lg:${l.color}">${esc(l.name)}</button>`).join('')}
-      </div>`).join('');
+    el.leaguebar.innerHTML = members.map((l) => {
+      const live = +liveCounts[l.id] || 0;
+      return `<button type="button" class="lg-chip${l.id === lg.id ? ' active' : ''}${live ? ' has-live' : ''}" data-league="${l.id}" style="--lg:${l.color}">
+        ${leagueBadge(l)}<span>${esc(l.name)}</span>${live ? `<span class="lg-live" title="${live} live">${live}</span>` : ''}
+      </button>`;
+    }).join('');
     el.leaguebar.querySelector('.lg-chip.active')?.scrollIntoView({ block: 'nearest', inline: 'center' });
   }
 
@@ -339,11 +393,12 @@
     const sport = SPORTS.find((s) => s.id === lg.cat);
     document.documentElement.style.setProperty('--accent', lg.color || '#e5484d');
     const meta = leagueMeta.get(lg.id);
-    el.heroLogo.innerHTML = meta?.logo ? `<img src="${esc(meta.logo)}" alt="">` : `<span>${sport?.icon || '★'}</span>`;
+    const hl = lg.isFav ? '' : leagueLogoUrl(lg) || meta?.logo;
+    el.heroLogo.innerHTML = hl ? `<img src="${esc(hl)}" alt="">` : lg.abbr ? `<b class="hero-abbr">${esc(lg.abbr)}</b>` : `<span>${sport?.icon || '★'}</span>`;
     el.heroName.textContent = lg.isFav ? 'Meine Favoriten' : lg.name;
     const kick = lg.isFav ? 'Teams & gemerkte Spiele aus allen Ligen'
       : lg.amateur ? 'Fußball · SGM Gündelbach/Häfnerhaslach'
-        : [sport?.label, lg.group, meta?.season].filter(Boolean).join(' · ');
+        : [sport?.label, meta?.season].filter(Boolean).join(' · ');
     el.heroKicker.textContent = kick;
   }
 
@@ -371,7 +426,7 @@
     const rel = relDay(state.date);
     el.dateText.textContent = rel ? `${rel} · ${fmtChip.format(state.date)}` : fmtShort.format(state.date);
     el.dateInput.value = toISODate(state.date);
-    el.todayBtn.hidden = rel === 'Heute';
+    el.todayBtn.hidden = ymdOf(state.date) === ymdOf(defaultAnchor(currentLeague()));
   }
   function renderChrome() {
     renderSports();
@@ -591,7 +646,7 @@
     const id = ++requestId;
     if (!silent) { skeleton(); showStatus(''); }
     const relevant = (lg) => [...favorites].some((k) => k.startsWith(`${lg.id}:`))
-      || pins.some((p) => p.lg === lg.id && p.day === (lg.amateur || lg.hockey ? ymdOf(state.date) : ymdInTZ(state.date, leagueTZ(lg))));
+      || pins.some((p) => p.lg === lg.id && p.day === (lg.amateur || lg.hockey ? ymdOf(state.date) : espnDayFor(lg, state.date)));
     const targets = LEAGUES.filter((l) => isEspn(l) && relevant(l));
     const amateurLg = LEAGUES.filter((l) => l.amateur && relevant(l));
     const hockeyTargets = LEAGUES.filter((l) => l.hockey && relevant(l));
@@ -602,7 +657,7 @@
     }
     try {
       const results = await Promise.all(targets.map(async (lg) => {
-        const params = { dates: ymdInTZ(state.date, leagueTZ(lg)) };
+        const params = { dates: espnDayFor(lg, state.date) };
         if (lg.groups) params.groups = lg.groups;
         try { return { lg, data: await api('scoreboard', params, lg) }; }
         catch { return { lg, data: { events: [] } }; }
@@ -1234,7 +1289,7 @@
     renderChrome();
     if (date) { state.date = date; load(); return; }
     if (!changed && !tab) { load(); return; }
-    state.date = todayAnchor();
+    state.date = defaultAnchor(lg);
     if (lg.hockey || lg.amateur) {
       renderTabs(); renderDate(); skeleton(); showStatus('');
       (lg.hockey ? snapHockey(lg) : snapAmateur(lg)).then(() => { if (currentLeague()?.id === lg.id) load(); });
@@ -1245,7 +1300,7 @@
     snapToGameDay(lg).then(() => {
       if (currentLeague()?.id !== lg.id) return;
       renderDate();
-      if (state.tab === 'scores' && ymdOf(state.date) !== ymdOf(todayAnchor())) load();
+      if (state.tab === 'scores' && ymdOf(state.date) !== ymdOf(defaultAnchor(currentLeague()))) load();
     });
   }
 
@@ -1275,7 +1330,7 @@
   el.nextDay.addEventListener('click', () => shiftDay(1));
   el.todayBtn.addEventListener('click', () => {
     const lg = currentLeague();
-    state.date = todayAnchor();
+    state.date = defaultAnchor(lg);
     if (lg.hockey) { skeleton(); snapHockey(lg).then(load); return; }
     if (lg.amateur) { skeleton(); snapAmateur(lg).then(load); return; }
     load();
@@ -1592,6 +1647,9 @@
   });
   el.version.textContent = VERSION;
   renderChrome();
+  loadLeagueLogos();
+  pollLive();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) pollLive(); });
   if (initialLeague.hockey || initialLeague.amateur) {
     renderTabs(); renderDate(); skeleton();
     (initialLeague.hockey ? snapHockey(initialLeague) : snapAmateur(initialLeague)).then(() => { if (currentLeague()?.id === initialLeague.id) load(); });
@@ -1601,7 +1659,7 @@
       snapToGameDay(initialLeague).then(() => {
         if (currentLeague()?.id !== initialLeague.id) return;
         renderDate();
-        if (state.tab === 'scores' && ymdOf(state.date) !== ymdOf(todayAnchor())) load();
+        if (state.tab === 'scores' && ymdOf(state.date) !== ymdOf(defaultAnchor(currentLeague()))) load();
       });
     }
   }

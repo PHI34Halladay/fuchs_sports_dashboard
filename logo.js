@@ -119,11 +119,17 @@ window.TeamColor = (() => {
     return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]);
   }
   // Primärfarbe bevorzugen; reines Schwarz/Weiß wirkt als Kartenfarbe leer → dann Alternativfarbe
+  // Schwarz, Weiß und Grautöne taugen nicht als Kartenfarbe → dann die Sekundärfarbe;
+  // ist auch die unbunt, bleibt die Karte neutral.
+  function unbunt(c) {
+    const [r, g, b] = rgb(c);
+    return Math.max(r, g, b) - Math.min(r, g, b) < 28 || lum(c) < 0.008;
+  }
   function pick(primary, alt) {
     const p = norm(primary), a = norm(alt);
-    if (p && lum(p) > 0.012 && lum(p) < 0.82) return p;
-    if (a && lum(a) > 0.012 && lum(a) < 0.82) return a;
-    return p || a || null;
+    if (p && !unbunt(p)) return p;
+    if (a && !unbunt(a)) return a;
+    return null;
   }
   // Zwei Teams mit (fast) gleicher Farbe: beim Gast auf die Alternativfarbe ausweichen
   function pair(home, away) {
@@ -131,7 +137,7 @@ window.TeamColor = (() => {
     let w = pick(away?.color, away?.alt);
     if (h && w && dist(h, w) < 70) {
       const alt = norm(away?.alt);
-      w = alt && dist(h, alt) >= 70 ? alt : '#5b6472';
+      w = alt && !unbunt(alt) && dist(h, alt) >= 70 ? alt : null;
     }
     return [h, w];
   }

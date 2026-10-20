@@ -31,7 +31,7 @@
 
   // ---------- Öffnen / Schließen ----------
   function open(eventId, opts = {}) {
-    current = { eventId, link: opts.link, league: opts.league || ctx.league(), event: opts.event || null, data: null, tab: null, period: 'all', filter: 'key', shotTeam: 'all', flow: 'diff', preview: opts.preview };
+    current = { eventId, link: opts.link, league: opts.league || ctx.league(), event: opts.event || null, data: null, tab: null, period: 'all', filter: 'key', shotTeam: 'all', flow: 'diff', boxTeam: null, preview: opts.preview };
     $head.innerHTML = opts.preview || '';
     $tabs.innerHTML = '';
     $scroll.scrollTop = 0;
@@ -126,7 +126,7 @@
   // aufhellen, bis sie sich abhebt (Farbton bleibt erhalten); reines Schwarz/Weiß → Alternativfarbe
   function pickColor(c1, c2) {
     const ok = (c) => c && /^[0-9a-f]{6}$/i.test(c);
-    const grey = (c) => { const [r, g, b] = [0, 2, 4].map((i) => parseInt(c.slice(i, i + 2), 16)); return Math.max(r, g, b) - Math.min(r, g, b) < 18; };
+    const grey = (c) => { const [r, g, b] = [0, 2, 4].map((i) => parseInt(c.slice(i, i + 2), 16)); return Math.max(r, g, b) - Math.min(r, g, b) < 28; };
     const base = [c1, c2].find((c) => ok(c) && !grey(c)) || [c1, c2].find(ok);
     if (!base) return '#8b96a5';
     let hex = base.toLowerCase();
@@ -317,7 +317,7 @@
     switch (current.tab) {
       case 'gamecast': $body.innerHTML = isMLB() ? mlbGamecast(d) : isFootball() ? footballGamecast(d) : isSoccer() ? soccerGamecast(d) : isBasketball() ? bbGamecast(d) : nhlGamecast(d); break;
       case 'pbp': $body.innerHTML = isMLB() ? mlbPlayByPlay(d) : isFootball() ? footballDrives(d) : isBasketball() ? bbPlayByPlay(d) : nhlPlayByPlay(d); break;
-      case 'box': $body.innerHTML = isMLB() ? mlbBoxscore(d) : isFootball() ? footballBoxscore(d) : isBasketball() ? bbBoxscore(d) : nhlBoxscore(d); break;
+      case 'box': $body.innerHTML = boxSwitch(d) + (isMLB() ? mlbBoxscore(d) : isFootball() ? footballBoxscore(d) : isBasketball() ? bbBoxscore(d) : nhlBoxscore(d)); break;
       case 'lineups': $body.innerHTML = soccerLineups(d); break;
       case 'ticker': $body.innerHTML = soccerTicker(d); break;
       case 'recap': $body.innerHTML = recap(d); break;
@@ -331,7 +331,7 @@
 
   // ---------- NHL: Gamecast ----------
   function nhlGamecast(d) {
-    return [stars(d), scoringSummary(d), shotChart(d), teamStatsCompare(d, NHL_TEAM_STATS), penaltySummary(d), videoHighlights(d), gameInfo(d)]
+    return [lastPlays(d), stars(d), leaderCards(d), flowChart(d), scoringSummary(d), shotChart(d), teamStatsCompare(d, NHL_TEAM_STATS), penaltySummary(d), videoHighlights(d), oddsSection(d), miniStandings(d), gameInfo(d)]
       .filter(Boolean).join('');
   }
 
@@ -620,7 +620,7 @@
 
   function nhlBoxscore(d) {
     const { home, away } = teams(d);
-    const order = [away, home];
+    const order = [boxSel(d)];
     return order.map((t) => {
       const team = (d.boxscore.players || []).find((p) => String(p.team?.id) === t.id);
       if (!team) return '';
@@ -662,7 +662,7 @@
   ];
 
   function footballGamecast(d) {
-    return [footballScoringSummary(d), teamStatsCompare(d, FOOTBALL_TEAM_STATS), footballLeaders(d), videoHighlights(d), gameInfo(d)]
+    return [lastPlays(d), leaderCards(d, ['passingYards', 'rushingYards', 'receivingYards']) || footballLeaders(d), flowChart(d), footballScoringSummary(d), teamStatsCompare(d, FOOTBALL_TEAM_STATS), videoHighlights(d), oddsSection(d), miniStandings(d), gameInfo(d)]
       .filter(Boolean).join('');
   }
 
@@ -747,7 +747,7 @@
 
   function footballBoxscore(d) {
     const { home, away } = teams(d);
-    const order = [away, home];
+    const order = [boxSel(d)];
     return order.map((t) => {
       const team = (d.boxscore.players || []).find((p) => String(p.team?.id) === t.id);
       if (!team) return '';
@@ -789,7 +789,7 @@
 
   function soccerGamecast(d) {
     const timeline = soccerTimeline(d);
-    return [timeline || soccerScoringSummary(d), teamStatsCompare(d, SOCCER_TEAM_STATS), videoHighlights(d), miniStandings(d), gameInfo(d)]
+    return [leaderCards(d), flowChart(d), timeline || soccerScoringSummary(d), teamStatsCompare(d, SOCCER_TEAM_STATS), videoHighlights(d), oddsSection(d), miniStandings(d), gameInfo(d)]
       .filter(Boolean).join('');
   }
 
@@ -860,7 +860,7 @@
         <div class="tl-side home">${isHome ? cell : ''}</div><div class="tl-min">${min}</div><div class="tl-side away">${isHome ? '' : cell}</div>
       </div>`;
     }).join('');
-    return section('Spielverlauf', `<div class="tl" style="--c-l:${home.color};--c-r:${away.color}">
+    return section('Ereignisse', `<div class="tl" style="--c-l:${home.color};--c-r:${away.color}">
       <div class="tl-head"><span class="gc-link"${teamIdAttr(home.id)}>${logoImg(home.id, home.logo)}${ctx.esc(home.short)}</span><span class="gc-link"${teamIdAttr(away.id)}>${ctx.esc(away.short)}${logoImg(away.id, away.logo)}</span></div>
       ${rows}</div>`);
   }
@@ -1092,108 +1092,173 @@
   ];
 
   function bbGamecast(d) {
-    return [bbLastPlays(d), bbLeaders(d), bbFlow(d), bbShotChart(d), teamStatsCompare(d, BB_TEAM_STATS), videoHighlights(d), oddsSection(d), miniStandings(d), gameInfo(d)]
+    return [lastPlays(d), leaderCards(d), flowChart(d), bbShotChart(d), teamStatsCompare(d, BB_TEAM_STATS), videoHighlights(d), oddsSection(d), miniStandings(d), gameInfo(d)]
       .filter(Boolean).join('');
   }
 
-  function bbLastPlays(d) {
+  // ---------- Gemeinsame Gamecast-Bausteine (alle Sportarten) ----------
+  // Reihenfolge wie im Kopfbereich: Fußball Heim links, US-Sport Gast links
+  function sides(d) {
+    const tm = teams(d);
+    return isSoccer() ? { left: tm.home, right: tm.away, ...tm } : { left: tm.away, right: tm.home, ...tm };
+  }
+
+  // Alle Spielzüge mit Spielstand (Football: aus den Drives)
+  function allPlays(d) {
+    if (isFootball()) return [...(d.drives?.previous || []), ...(d.drives?.current ? [d.drives.current] : [])].flatMap((dr) => dr.plays || []);
+    return d.plays || [];
+  }
+
+  function lastPlays(d) {
     if (gameState(d) !== 'in') return '';
-    const plays = (d.plays || []).slice(-6).reverse();
+    const plays = allPlays(d).filter((p) => p.text).slice(-6).reverse();
     if (!plays.length) return '';
     const { byId } = teams(d);
     return section('Letzte Aktionen', plays.map((p) => {
-      const t = byId[String(p.team?.id)];
-      return `<div class="gc-play${p.scoringPlay ? ' goal' : ''}"><div class="gc-time">${ctx.esc(p.clock?.displayValue || '')}</div>${t?.logo ? logoImg(t.id, t.logo) : '<span></span>'}<div>${ctx.esc(p.text || '')}</div><div class="gc-play-score">${p.scoringPlay ? ctx.esc(`${p.awayScore}–${p.homeScore}`) : ''}</div></div>`;
+      const t = byId[String(p.team?.id ?? p.start?.team?.id)];
+      const when = isMLB() ? (p.period?.type === 'Top' ? '▲' : '▼') + (p.period?.number || '') : p.clock?.displayValue || '';
+      return `<div class="gc-play${p.scoringPlay ? ' goal' : ''}"><div class="gc-time">${ctx.esc(when)}</div>${t?.logo ? logoImg(t.id, t.logo) : '<span></span>'}<div>${ctx.esc(p.text || '')}</div><div class="gc-play-score">${p.scoringPlay && p.homeScore != null ? ctx.esc(`${p.awayScore}–${p.homeScore}`) : ''}</div></div>`;
     }).join(''));
   }
 
-  function bbLeaders(d) {
+  // Topspieler als Karten mit Foto und großer Kennzahl (ESPN "leaders" je Team)
+  const LEADER_DE = {
+    points: 'Punkte', rebounds: 'Rebounds', assists: 'Assists',
+    passingYards: 'Passing', rushingYards: 'Rushing', receivingYards: 'Receiving',
+    goals: 'Tore', goalAssists: 'Vorlagen', totalShots: 'Schüsse', shotsOnTarget: 'Torschüsse', saves: 'Paraden',
+    points_hockey: 'Punkte', plusMinus: '+/-', avg: 'Schnitt', homeRuns: 'Home Runs', RBIs: 'RBI', ERA: 'ERA', strikeouts: 'Strikeouts',
+  };
+  function leaderValue(l, cat) {
+    if (l.mainStat?.value != null) return [l.mainStat.value, l.mainStat.label || ''];
+    const dv = String(l.displayValue ?? '');
+    const m = /(-?\d+(?:\.\d+)?)\s*(YDS|PTS|REB|AST|G|A|SV)\b/i.exec(dv);
+    if (m) return [m[1], m[2].toUpperCase()];
+    if (/^-?\d+(\.\d+)?%?$/.test(dv)) return [dv, cat.shortDisplayName || cat.abbreviation || ''];
+    return [null, ''];
+  }
+  function leaderCards(d, wanted) {
     const tl = (d.leaders || []).filter((t) => (t.leaders || []).length);
     if (!tl.length) return '';
-    const { byId, home, away } = teams(d);
-    const ordered = [away, home].map((t) => tl.find((x) => String(x.team?.id) === t.id)).filter(Boolean);
-    const CAT = { points: 'Punkte', rebounds: 'Rebounds', assists: 'Assists' };
-    return section(gameState(d) === 'pre' ? 'Topspieler der Saison' : 'Topspieler', `<div class="bb-leaders">${ordered.map((t) => {
+    const { left, right, byId } = sides(d);
+    const ordered = [left, right].map((t) => tl.find((x) => String(x.team?.id) === t.id)).filter(Boolean);
+    if (!ordered.length) return '';
+    const html = ordered.map((t) => {
       const ti = byId[String(t.team?.id)] || {};
+      const cats = (t.leaders || []).filter((c) => !wanted || wanted.includes(c.name)).slice(0, 3);
+      const rows = cats.map((cat) => {
+        const l = cat.leaders?.[0];
+        if (!l?.athlete) return '';
+        const a = l.athlete;
+        const [val, lab] = leaderValue(l, cat);
+        const sub = l.summary || (val == null ? l.displayValue : '') || '';
+        return `<div class="bb-lead gc-link" data-player-id="${ctx.esc(a.id)}">
+          ${a.headshot?.href ? `<img src="${ctx.esc(a.headshot.href)}" alt="" loading="lazy">` : '<span class="bb-ph"></span>'}
+          <div class="bb-lead-txt"><small>${ctx.esc(LEADER_DE[cat.name] || cat.displayName || '')}</small><b>${ctx.esc(a.shortName || a.displayName || '')}</b><span class="muted">${ctx.esc(sub)}</span></div>
+          ${val != null ? `<div class="bb-lead-val">${ctx.esc(val)}<small>${ctx.esc(lab)}</small></div>` : '<span></span>'}
+        </div>`;
+      }).join('');
+      if (!rows.trim()) return '';
       return `<div class="bb-lcol" style="--tc:${ti.color}">
-        <div class="gc-leaders-team gc-link"${teamIdAttr(ti.id)}>${logoImg(ti.id, ti.logo)}${ctx.esc(ti.name || '')}</div>
-        ${(t.leaders || []).filter((c) => CAT[c.name] || true).slice(0, 3).map((cat) => {
-          const l = cat.leaders?.[0];
-          if (!l?.athlete) return '';
-          const a = l.athlete;
-          return `<div class="bb-lead gc-link" data-player-id="${ctx.esc(a.id)}">
-            ${a.headshot?.href ? `<img src="${ctx.esc(a.headshot.href)}" alt="" loading="lazy">` : '<span class="bb-ph"></span>'}
-            <div class="bb-lead-txt"><small>${ctx.esc(CAT[cat.name] || cat.displayName || '')}</small><b>${ctx.esc(a.shortName || a.displayName || '')}</b><span class="muted">${ctx.esc(l.summary || '')}</span></div>
-            <div class="bb-lead-val">${ctx.esc(l.mainStat?.value ?? l.displayValue ?? '')}<small>${ctx.esc(l.mainStat?.label || '')}</small></div>
-          </div>`;
-        }).join('')}
-      </div>`;
-    }).join('')}</div>`);
+        <div class="gc-leaders-team gc-link"${teamIdAttr(ti.id)}>${logoImg(ti.id, ti.logo)}${ctx.esc(ti.name || '')}</div>${rows}</div>`;
+    }).join('');
+    return html.trim() ? section(gameState(d) === 'pre' ? 'Topspieler der Saison' : 'Topspieler', `<div class="bb-leaders">${html}</div>`) : '';
   }
 
-  // Sekunden seit Spielbeginn für einen Spielzug (Viertel 12 Min. NBA, Halbzeiten 20 Min. College, OT 5 Min.)
-  function bbTiming(d) {
-    const reg = d.format?.regulation?.periods || 4;
-    const len = reg === 2 ? 1200 : 720;
-    const startOf = (n) => (n <= reg ? (n - 1) * len : reg * len + (n - reg - 1) * 300);
-    const lenOf = (n) => (n <= reg ? len : 300);
-    const clockSec = (s) => {
-      const str = String(s || '0');
-      if (str.includes(':')) { const [m, sec] = str.split(':'); return (+m || 0) * 60 + (parseFloat(sec) || 0); }
-      return parseFloat(str) || 0;
-    };
+  // Zeitachse je Sportart: Sekunden seit Spielbeginn (Uhr läuft rückwärts) bzw. Spielzug-Index (MLB)
+  function clockSec(s) {
+    const str = String(s || '0');
+    if (str.includes(':')) { const [m, sec] = str.split(':'); return (+m || 0) * 60 + (parseFloat(sec) || 0); }
+    return parseFloat(str) || 0;
+  }
+  function timing(d, plays) {
+    const reg = d.format?.regulation?.periods || (isNHL() ? 3 : 4);
+    const len = isBasketball() ? (reg === 2 ? 1200 : 720) : isNHL() ? 1200 : 900;
+    const maxP = Math.max(reg, ...plays.map((p) => p.period?.number || 0));
+    const otLen = isBasketball() ? 300 : isNHL() ? (maxP > reg + 1 ? 1200 : 300) : 600;
+    const startOf = (n) => (n <= reg ? (n - 1) * len : reg * len + (n - reg - 1) * otLen);
+    const lenOf = (n) => (n <= reg ? len : otLen);
     const elapsed = (p) => { const n = p.period?.number || 1; return startOf(n) + Math.max(0, lenOf(n) - clockSec(p.clock?.displayValue)); };
-    return { reg, startOf, lenOf, elapsed };
+    return { reg, maxP, startOf, lenOf, elapsed, total: startOf(maxP) + lenOf(maxP) };
   }
 
-  function bbFlow(d) {
-    const plays = (d.plays || []).filter((p) => p.period?.number);
-    if (plays.length < 5) return '';
-    const { home, away } = teams(d);
-    const T = bbTiming(d);
-    const maxPer = Math.max(T.reg, ...plays.map((p) => p.period.number));
-    const total = T.startOf(maxPer) + T.lenOf(maxPer);
-    const W = 600, H = 170, M = H / 2;
-    const wp = (d.winprobability || []);
-    const mode = current.flow === 'wp' && wp.length ? 'wp' : 'diff';
-    let pts;
-    let maxAbs = 5;
-    if (mode === 'diff') {
-      pts = [[0, 0]];
-      plays.forEach((p) => {
-        if (p.homeScore == null) return;
-        const diff = p.homeScore - p.awayScore;
-        maxAbs = Math.max(maxAbs, Math.abs(diff));
-        pts.push([T.elapsed(p), diff]);
+  // Liefert { pts: [[t, Heim−Gast]], wp: [[t, Heim-Siegchance−50]] | null, total, seps, labels }
+  function flowSeries(d) {
+    if (isSoccer()) {
+      const mins = (s) => { const m = String(s || '').match(/(\d+)'(?:\+(\d+))?/); return m ? Math.min(+m[1], 120) + (m[2] ? Math.min(+m[2], 9) * 0.1 : 0) : null; };
+      const { home } = teams(d);
+      let hs = 0, as = 0;
+      const pts = [[0, 0]];
+      let maxMin = 90;
+      (d.keyEvents || []).forEach((e) => {
+        const k = keKind(e); const t = mins(e.clock?.displayValue);
+        if (t != null && t >= 91) maxMin = 120; // Verlängerung (Nachspielzeit ist 90'+x = 90,x)
+        if (!['goal', 'penalty', 'own-goal'].includes(k) || t == null) return;
+        if (String(e.team?.id) === home.id) hs++; else as++;
+        pts.push([t, hs - as]);
       });
-    } else {
-      const byPlay = new Map(plays.map((p) => [String(p.id), p]));
-      pts = wp.map((w) => { const p = byPlay.get(String(w.playId)); return p ? [T.elapsed(p), (w.homeWinPercentage - 0.5) * 100] : null; }).filter(Boolean);
-      maxAbs = 50;
+      const st = comp(d).status || {};
+      const now = gameState(d) === 'post' ? maxMin : gameState(d) === 'in' ? (mins(st.displayClock || st.type?.shortDetail) ?? pts[pts.length - 1][0]) : 0;
+      if (now) pts.push([now, hs - as]);
+      const seps = maxMin > 90 ? [45, 90, 105] : [45];
+      const labels = maxMin > 90 ? [[22.5, '1. HZ'], [67.5, '2. HZ'], [97.5, 'V1'], [112.5, 'V2']] : [[22.5, '1. Halbzeit'], [67.5, '2. Halbzeit']];
+      return { pts, wp: null, total: maxMin, seps, labels, unit: 'Tore' };
     }
-    if (pts.length < 3) return '';
-    const sx = (t) => (t / total) * W;
-    const sy = (v) => M - (v / maxAbs) * (M - 8);
+    const plays = allPlays(d).filter((p) => p.period?.number && !/^SO$|shootout/i.test(p.period?.displayValue || p.period?.type || ''));
+    if (plays.length < 5) return null;
+    let at, total, seps = [], labels = [];
+    if (isMLB()) {
+      at = new Map(plays.map((p, i) => [p, i]));
+      total = plays.length;
+      const firsts = new Map();
+      plays.forEach((p, i) => { if (!firsts.has(p.period.number)) firsts.set(p.period.number, i); });
+      const inn = [...firsts.entries()];
+      seps = inn.slice(1).map(([, i]) => i);
+      labels = inn.map(([n, i], k) => [(i + (inn[k + 1]?.[1] ?? total)) / 2, String(n)]);
+    } else {
+      const T = timing(d, plays);
+      at = new Map(plays.map((p) => [p, T.elapsed(p)]));
+      total = T.total;
+      seps = Array.from({ length: T.maxP - 1 }, (_, i) => T.startOf(i + 2));
+      labels = periodLabels(d, T.maxP).map((l, i) => [T.startOf(i + 1) + T.lenOf(i + 1) / 2, l]);
+    }
+    const pts = [[0, 0]];
+    plays.forEach((p) => { if (p.homeScore != null && p.awayScore != null) pts.push([at.get(p), p.homeScore - p.awayScore]); });
+    const byId = new Map(plays.map((p) => [String(p.id), p]));
+    const wp = (d.winprobability || []).map((w) => { const p = byId.get(String(w.playId)); return p ? [at.get(p), (w.homeWinPercentage - 0.5) * 100] : null; }).filter(Boolean);
+    return { pts, wp: wp.length > 3 ? wp : null, total, seps, labels, unit: isBasketball() ? 'Punkte' : isNHL() ? 'Tore' : isMLB() ? 'Runs' : 'Punkte' };
+  }
+
+  function flowChart(d) {
+    const S = flowSeries(d);
+    if (!S || S.pts.length < 2 || !S.total) return '';
+    const { home, away } = teams(d);
+    const W = 600, H = 170, M = H / 2;
+    const mode = current.flow === 'wp' && S.wp ? 'wp' : 'diff';
+    const pts = mode === 'wp' ? S.wp : S.pts;
+    const maxAbs = mode === 'wp' ? 50 : Math.max(isBasketball() || isFootball() ? 5 : 2, ...pts.map(([, v]) => Math.abs(v)));
+    const sx = (t) => Math.min(W, (t / S.total) * W);
+    const sy = (v) => M - (v / maxAbs) * (M - 10);
     let path = `M0 ${sy(pts[0][1]).toFixed(1)}`;
     pts.forEach(([t, v], i) => {
-      if (mode === 'diff' && i) path += `H${sx(t).toFixed(1)}`;
-      path += `${mode === 'diff' ? 'V' : `L${sx(t).toFixed(1)} `}${sy(v).toFixed(1)}`;
+      if (mode === 'diff') path += `${i ? `H${sx(t).toFixed(1)}` : ''}V${sy(v).toFixed(1)}`;
+      else path += `L${sx(t).toFixed(1)} ${sy(v).toFixed(1)}`;
     });
     const lastX = sx(pts[pts.length - 1][0]).toFixed(1);
     const area = `${path}V${M}H0Z`;
-    const seps = Array.from({ length: maxPer - 1 }, (_, i) => sx(T.startOf(i + 2))).map((x) => `<line x1="${x}" x2="${x}" y1="0" y2="${H}" class="fl-sep"/>`).join('');
-    const labels = periodLabels(d, maxPer).map((l, i) => `<text x="${sx(T.startOf(i + 1) + T.lenOf(i + 1) / 2)}" y="${H - 4}" class="fl-lab">${l}</text>`).join('');
+    const seps = S.seps.map((t) => `<line x1="${sx(t)}" x2="${sx(t)}" y1="0" y2="${H}" class="fl-sep"/>`).join('');
+    const labels = S.labels.map(([t, l]) => `<text x="${sx(t)}" y="${H - 4}" class="fl-lab">${ctx.esc(l)}</text>`).join('');
     const grid = mode === 'diff'
       ? [maxAbs, -maxAbs].map((v) => `<text x="4" y="${sy(v) + (v > 0 ? 10 : -3)}" class="fl-axis">${v > 0 ? '+' : '−'}${Math.abs(v)}</text>`).join('')
       : `<text x="4" y="14" class="fl-axis">100 %</text><text x="4" y="${H - 16}" class="fl-axis">100 %</text>`;
     const uid = `fl${current.eventId}`;
-    const chips = wp.length ? `<div class="gc-chips">
-      <button class="gc-chip${mode === 'diff' ? ' active' : ''}" data-flow="diff">Punktedifferenz</button>
+    const chips = S.wp ? `<div class="gc-chips">
+      <button class="gc-chip${mode === 'diff' ? ' active' : ''}" data-flow="diff">${ctx.esc(S.unit)}-Differenz</button>
       <button class="gc-chip${mode === 'wp' ? ' active' : ''}" data-flow="wp">Siegwahrscheinlichkeit</button></div>` : '';
     const lead = pts[pts.length - 1][1];
+    const nm = (t) => ctx.esc(isSoccer() ? t.short : t.abbr);
     return section('Spielverlauf', `${chips}
       <div class="flow">
-        <div class="fl-tag top" style="--tc:${home.color}">${logoImg(home.id, home.logo)}${ctx.esc(home.abbr)} ${mode === 'diff' ? 'führt' : 'gewinnt'}</div>
+        <div class="fl-tag top" style="--tc:${home.color}">${logoImg(home.id, home.logo)}${nm(home)} ${mode === 'diff' ? 'führt' : 'gewinnt'}</div>
         <svg viewBox="0 0 ${W} ${H}" class="fl-svg" preserveAspectRatio="none" role="img" aria-label="Spielverlauf">
           <defs><clipPath id="${uid}t"><rect x="0" y="0" width="${W}" height="${M}"/></clipPath><clipPath id="${uid}b"><rect x="0" y="${M}" width="${W}" height="${M}"/></clipPath></defs>
           ${seps}
@@ -1204,9 +1269,23 @@
           <line x1="${lastX}" x2="${lastX}" y1="0" y2="${H}" class="fl-now"/>
           ${grid}${labels}
         </svg>
-        <div class="fl-tag bottom" style="--tc:${away.color}">${logoImg(away.id, away.logo)}${ctx.esc(away.abbr)} ${mode === 'diff' ? 'führt' : 'gewinnt'}</div>
+        <div class="fl-tag bottom" style="--tc:${away.color}">${logoImg(away.id, away.logo)}${nm(away)} ${mode === 'diff' ? 'führt' : 'gewinnt'}</div>
       </div>
-      <div class="gc-note">${mode === 'diff' ? `Aktuell: ${lead === 0 ? 'Gleichstand' : `${ctx.esc(lead > 0 ? home.abbr : away.abbr)} +${Math.abs(lead)}`}` : `Aktuell: ${ctx.esc(home.abbr)} ${(lead + 50).toFixed(1)} % Siegchance (ESPN-Modell)`}</div>`);
+      <div class="gc-note">${mode === 'diff' ? `${gameState(d) === 'post' ? 'Endstand' : 'Aktuell'}: ${lead === 0 ? 'Gleichstand' : `${lead > 0 ? nm(home) : nm(away)} +${Math.abs(lead)}`}` : `Aktuell: ${nm(home)} ${(lead + 50).toFixed(1)} % Siegchance (ESPN-Modell)`}</div>`);
+  }
+
+  // ---------- Boxscore: Umschalter zwischen den Teams ----------
+  function boxSel(d) {
+    const { left, right } = sides(d);
+    return [left, right].find((t) => t.id === current.boxTeam) || left;
+  }
+  function boxSwitch(d) {
+    const { left, right } = sides(d);
+    const sel = boxSel(d);
+    return `<div class="box-switch" role="tablist">${[left, right].map((t) => `
+      <button type="button" class="box-sw${t.id === sel.id ? ' active' : ''}" data-boxteam="${ctx.esc(t.id)}" style="--tc:${t.color}" role="tab" aria-selected="${t.id === sel.id}">
+        ${logoImg(t.id, t.logo)}<span>${ctx.esc(t.name)}</span>
+      </button>`).join('')}</div>`;
   }
 
   // Wurfkarte: ESPN-Koordinaten in Fuß, x = 0–50 (Seitenlinie zu Seitenlinie), y = Abstand
@@ -1304,7 +1383,7 @@
   // ---------- Basketball: Boxscore ----------
   function bbBoxscore(d) {
     const { home, away } = teams(d);
-    return [away, home].map((t) => {
+    return [boxSel(d)].map((t) => {
       const team = (d.boxscore.players || []).find((p) => String(p.team?.id) === t.id);
       const g = team?.statistics?.[0];
       if (!g) return '';
@@ -1337,7 +1416,7 @@
 
   // ---------- MLB: Gamecast ----------
   function mlbGamecast(d) {
-    return [decisions(d), mlbScoringSummary(d), mlbTeamStatsCompare(d), videoHighlights(d), gameInfo(d)]
+    return [lastPlays(d), decisions(d), leaderCards(d), flowChart(d), mlbScoringSummary(d), mlbTeamStatsCompare(d), videoHighlights(d), oddsSection(d), miniStandings(d), gameInfo(d)]
       .filter(Boolean).join('');
   }
 
@@ -1459,7 +1538,7 @@
 
   function mlbBoxscore(d) {
     const { home, away } = teams(d);
-    const order = [away, home];
+    const order = [boxSel(d)];
     return order.map((t) => {
       const team = (d.boxscore.players || []).find((p) => String(p.team?.id) === t.id);
       if (!team) return '';
@@ -1624,6 +1703,8 @@
     if (per) { current.period = per.dataset.period; render(true); return; }
     const f = e.target.closest('[data-filter]');
     if (f) { current.filter = f.dataset.filter; render(true); return; }
+    const bt = e.target.closest('[data-boxteam]');
+    if (bt) { current.boxTeam = bt.dataset.boxteam; render(true); return; }
     const sf = e.target.closest('[data-shotteam]');
     if (sf) { current.shotTeam = sf.dataset.shotteam; render(true); return; }
     const fl = e.target.closest('[data-flow]');
