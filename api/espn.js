@@ -116,7 +116,11 @@ async function handler(req, res) {
       return;
     }
 
-    const data = await upstream.json();
+    let data = await upstream.json();
+    // Suche: nur Spieler/Teams weitergeben (ESPN hängt Artikel und Clips an – unnötig groß)
+    if (req.query.type === 'search') {
+      data = { results: (data.results || []).filter((g) => g.type === 'player' || g.type === 'team') };
+    }
     const ttl = CACHE[req.query.type];
     res.setHeader('Cache-Control', `public, s-maxage=${ttl}, stale-while-revalidate=${ttl * 3}`);
     res.status(200).json(data);
