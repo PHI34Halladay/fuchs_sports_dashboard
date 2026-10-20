@@ -241,16 +241,6 @@ async function handler(req, res) {
     return;
   }
   try {
-    if (q.type === 'raw' && process.env.HOCKEYWEB_DEBUG === '1') { // TEMPORÄR: nur zum Erkunden
-      const ok = new Set(['teamList', 'matchEvents', 'matchStats', 'matchTeamPlayer', 'news', 'roundsForSeason', 'currentMatches', 'teamRounds']);
-      const rq = String(q.req || '');
-      if (!ok.has(rq)) { res.status(400).json({ error: 'req' }); return; }
-      const params = Object.fromEntries(['teamId', 'roundId', 'seasonId', 'matchId', 'leagueId', 'newsGroupId'].map((k) => [k, q[k]]));
-      const r = await fetch(app.apiUrl(rq, params, process.env.HOCKEYWEB_APP_KEY), { headers: { 'User-Agent': UA } });
-      res.status(200).setHeader('Content-Type', 'application/json');
-      res.end(await r.text());
-      return;
-    }
     if (q.type === 'match' || q.type === 'news') {
       if (q.type === 'match') await handleMatchApp(al, key, q, res); else await handleNewsApp(al, key, res);
       return;

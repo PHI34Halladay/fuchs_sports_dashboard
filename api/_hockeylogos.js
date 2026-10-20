@@ -100,7 +100,21 @@ const FILES = {
  "Storhamar Dragons": "storhamar-ishockey-logo-svg",
  "Boxers de Bordeaux": "bordeaux-boxers",
  "Herning Blue Fox": "herning-blue-fox-logo-svg",
- "GKS Tychy": "gks-tychy-logo-svg"
+ "GKS Tychy": "gks-tychy-logo-svg",
+ "Färjestad BK": "faerjestad-bk-logo-svg",
+ "IF Björklöven": "if-björklöven",
+ "Brynäs IF": "bynaes-if-logo-svg",
+ "IF Malmö Redhawks": "if-malmoe-redhawks-logo-svg",
+ "Luleå HF": "lulea-hf-logo-svg",
+ "Örebro HK": "oerebro-hk-logo-svg",
+ "Timrå IK": "timra-ik-logo-svg",
+ "Djurgårdens IF": "djurgardens-if-logo-svg",
+ "HV71 Jönköping": "hv71-jönköping-logo-svg",
+ "Linköpings HC": "linkoepings-hc-logo-svg",
+ "Höchstadter EC": "hoechstadt-ec-logo-png",
+ "Herforder EV": "herforder-ev-logo-jpeg",
+ "Black Dragons Erfurt": "tecart-black-dragons-logo-png",
+ "Herner EV": "herner-ev-miners-logo-png"
 };
 
 // Name normalisieren: Kleinbuchstaben, ohne Umlaute/Akzente und Sonderzeichen

@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '2.3.0';
+  const VERSION = '2.3.1';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -48,10 +48,10 @@
     { id: 'del2', abbr: 'DEL2', name: 'DEL2', cat: 'hockey', group: 'Deutschland', hockey: 'del2', color: '#22b8e8' },
     { id: 'obs', abbr: 'OL S', name: 'Oberliga Süd', cat: 'hockey', group: 'Deutschland', hockey: 'obs', color: '#7ea6ff' },
     { id: 'obn', abbr: 'OL N', name: 'Oberliga Nord', cat: 'hockey', group: 'Deutschland', hockey: 'obn', color: '#7ea6ff' },
-    { id: 'nl', abbr: 'NL', name: 'NL (Schweiz)', cat: 'hockey', group: 'Europa', hockey: 'nl', color: '#ff3b3b' },
+    { id: 'nl', abbr: 'NL', name: 'NL (Schweiz)', cat: 'hockey', group: 'Europa', hockey: 'nl', noNews: true, color: '#ff3b3b' },
     { id: 'icehl', abbr: 'ICE', name: 'ICEHL', cat: 'hockey', group: 'Europa', hockey: 'icehl', color: '#ff6b6b' },
     { id: 'chl', abbr: 'CHL', name: 'CHL', cat: 'hockey', group: 'Europa', hockey: 'chl', color: '#ffb000' },
-    { id: 'shl', abbr: 'SHL', name: 'SHL', cat: 'hockey', group: 'Europa', hockey: 'shl', color: '#2fb0ff' },
+    { id: 'shl', abbr: 'SHL', name: 'SHL', cat: 'hockey', group: 'Europa', hockey: 'shl', noNews: true, color: '#2fb0ff' },
     { id: 'dcup', abbr: 'DCup', name: 'Deutschland-Cup', cat: 'hockey', group: 'Deutschland', hockey: 'dcup', color: '#e0483e' },
 
     { id: 'mlb', abbr: 'MLB', name: 'MLB', cat: 'baseball', group: 'Profis', sport: 'baseball', league: 'mlb', color: '#4a83e8' },
@@ -68,6 +68,8 @@
 
   // Ligen mit eigener Datenquelle (Fussball.de bzw. Hockeyweb) laufen nicht über die ESPN-API
   // und haben keinen News-Tab.
+  // Kein News-Tab: Amateurfußball und Hockeyweb-Ligen ohne eigene Meldungsgruppe (NL, SHL)
+  function noNewsTab(l) { return !!(l && (l.amateur || l.noNews)); }
   function isOwnSource(l) { return !!(l && (l.amateur || l.hockey)); }
   const isEspn = (l) => !!(l && l.sport && l.league);
 
@@ -85,7 +87,7 @@
   const initialLeague = LEAGUES.find((l) => l.id === initialLeagueId);
   const state = {
     leagueId: initialLeagueId,
-    tab: initialLeagueId === FAV_ID ? 'scores' : (['scores', 'standings', 'news'].includes(saved.tab) && !(initialLeague.amateur && saved.tab === 'news') ? saved.tab : 'scores'),
+    tab: initialLeagueId === FAV_ID ? 'scores' : (['scores', 'standings', 'news'].includes(saved.tab) && !(noNewsTab(initialLeague) && saved.tab === 'news') ? saved.tab : 'scores'),
     date: defaultAnchor(initialLeague),
     top25Only: !!saved.top25Only,
     standingsConf: null, // Tabellen-Ansicht bei NCAAF/NCAAM: 'top25' oder ein Conference-Name
@@ -409,7 +411,7 @@
     const isFavView = !!lg.isFav;
     const isCollege = COLLEGE_IDS.has(state.leagueId);
     el.tabs.querySelectorAll('.tab').forEach((b) => {
-      const hide = (isFavView && b.dataset.tab !== 'scores') || (lg.amateur && b.dataset.tab === 'news');
+      const hide = (isFavView && b.dataset.tab !== 'scores') || (noNewsTab(lg) && b.dataset.tab === 'news');
       b.style.display = hide ? 'none' : '';
       const active = b.dataset.tab === state.tab;
       b.classList.toggle('active', active);
@@ -1326,7 +1328,7 @@
     state.leagueId = id;
     if (tab) state.tab = tab;
     if (lg.isFav) state.tab = 'scores';
-    if (lg.amateur && state.tab === 'news') state.tab = 'scores';
+    if (noNewsTab(lg) && state.tab === 'news') state.tab = 'scores';
     if (changed) { state.standingsConf = null; lastStandings = null; }
     if (lg.cat !== 'fav') { lastLeague[lg.cat] = id; writeJSON(LS_LAST, lastLeague); }
     persist();
