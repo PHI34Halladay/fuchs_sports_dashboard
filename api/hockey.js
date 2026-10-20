@@ -34,14 +34,14 @@ async function get(url, ttlSec) {
   return html;
 }
 
-// Antwort der App-API (JSON) je Runde kurz zwischenspeichern; die Signatur ändert sich je Anfrage
-async function getApp(request, roundId, ttlSec) {
+// Antwort der App-API (JSON) kurz zwischenspeichern; die Signatur ändert sich je Anfrage
+async function getApp(request, params, ttlSec) {
   const key = process.env.HOCKEYWEB_APP_KEY;
   if (!key) throw new Error('HOCKEYWEB_APP_KEY nicht gesetzt');
-  const ck = `app:${request}:${roundId}`;
+  const ck = `app:${request}:${JSON.stringify(params)}`;
   const hit = memo.get(ck);
   if (hit && Date.now() - hit.t < ttlSec * 1000) return hit.json;
-  const res = await fetch(app.apiUrl(request, roundId, key), {
+  const res = await fetch(app.apiUrl(request, params, key), {
     headers: { 'User-Agent': UA, Accept: 'application/json' },
     signal: AbortSignal.timeout(8000),
   });
@@ -49,48 +49,102 @@ async function getApp(request, roundId, ttlSec) {
   const json = await res.json();
   if (json?.status && json.status !== 'ok') throw new Error('App-API: ' + json.status);
   memo.set(ck, { t: Date.now(), json });
-  if (memo.size > 80) memo.delete(memo.keys().next().value);
+  if (memo.size > 120) memo.delete(memo.keys().next().value);
   return json;
 }
 
-async function handleGamesApp(lg, key, date, res) {
-  const lgUrl = publicUrl(lg, 'spielplan');
-  const all = app.mapSchedule(await getApp('schedule', app.ROUNDS[key], TTL_LIVE), lgUrl);
+const siteUrl = (al, kind) => `${app.SITE}/${al.path}/${kind}`;
+const cacheHeader = (res, ttl) => res.setHeader('Cache-Control', `public, s-maxage=${ttl}, stale-while-revalidate=${ttl * 3}`);
+
+// Runden der Liga (Hauptrunde, Playoffs …); Fehler hier dürfen die Spiele nicht verhindern
+async function leagueRounds(al) {
+  try {
+    const all = app.mapRounds(await getApp('roundsForSeason', { seasonId: app.SEASON_ID }, 3600));
+    const list = all[al.api] || [];
+    return list.some((r) => r.id === al.round) ? list : [{ id: al.round, name: 'Hauptrunde', type: 'table' }, ...list];
+  } catch { return [{ id: al.round, name: 'Hauptrunde', type: 'table' }]; }
+}
+
+// gewünschte Runde (?round=) nur zulassen, wenn sie zur Liga gehört
+function pickRound(al, rounds, q) {
+  const want = Number(q.round);
+  return Number.isInteger(want) && rounds.some((r) => r.id === want) ? want : al.round;
+}
+
+async function handleGamesApp(al, key, date, q, res) {
+  const rounds = await leagueRounds(al);
+  const round = pickRound(al, rounds, q);
+  const all = app.mapSchedule(await getApp('schedule', { roundId: round, seasonId: app.SEASON_ID }, TTL_LIVE), siteUrl(al, 'spielplan'));
   if (!all.length) throw new Error('App-API ohne Spiele');
   const games = all.filter((g) => g.date === date);
-  const live = games.some((g) => g.live);
-  const ttl = live ? TTL_LIVE : TTL_GAMES;
-  res.setHeader('Cache-Control', `public, s-maxage=${ttl}, stale-while-revalidate=${ttl * 3}`);
+  const ttl = games.some((g) => g.live) ? TTL_LIVE : TTL_GAMES;
+  cacheHeader(res, ttl);
   res.status(200).json({
-    league: { key, name: lg.name, url: lgUrl },
+    league: { key, name: al.name, url: siteUrl(al, 'spielplan') },
     date,
     games,
     days: [...new Set(all.map((g) => g.date))].sort(),
     calendar: [],
+    rounds,
+    round,
     errors: [],
     source: 'app',
     fetchedAt: new Date().toISOString(),
   });
 }
 
-async function handleStandingsApp(lg, key, q, res) {
-  const payload = await getApp('table', app.ROUNDS[key], TTL_TABLE);
-  let groups = app.mapTable(payload, lg.name);
+async function handleStandingsApp(al, key, q, res) {
+  const rounds = await leagueRounds(al);
+  const round = pickRound(al, rounds, q);
+  const payload = await getApp('table', { roundId: round, seasonId: app.SEASON_ID }, TTL_TABLE);
+  let groups = app.mapTable(payload, al.name);
   let how = 'app';
   if (!groups) {
-    const all = app.mapSchedule(await getApp('schedule', app.ROUNDS[key], TTL_LIVE), publicUrl(lg, 'spielplan'));
-    groups = app.computeTable(all, lg.name);
+    const all = app.mapSchedule(await getApp('schedule', { roundId: round, seasonId: app.SEASON_ID }, TTL_LIVE), siteUrl(al, 'spielplan'));
+    groups = app.computeTable(all, al.name);
     how = 'berechnet';
   }
   if (!groups.length) throw new Error('App-API ohne Tabelle');
-  res.setHeader('Cache-Control', `public, s-maxage=${TTL_TABLE}, stale-while-revalidate=${TTL_TABLE * 3}`);
-  const body = { league: { key, name: lg.name, url: tableUrl(lg) }, groups, source: how, fetchedAt: new Date().toISOString() };
+  cacheHeader(res, TTL_TABLE);
+  const body = { league: { key, name: al.name, url: siteUrl(al, 'tabelle') }, groups, rounds, round, source: how, fetchedAt: new Date().toISOString() };
   if (q.debug) { // nur Aufbau zeigen (Feldnamen), keine Zugangsdaten
     const t = payload?.table || {};
     const rows = Array.isArray(t.table) ? t.table : Object.values(t.table || {});
     body.debug = { tableKeys: Object.keys(t), isArray: Array.isArray(t.table), rowCount: rows.length, firstRow: rows[0] || null };
   }
   res.status(200).json(body);
+}
+
+// Spieldetails: Tore/Strafen, Aufstellungen, Direktvergleich (?match=ID&home=TeamID&away=TeamID)
+async function handleMatchApp(al, key, q, res) {
+  const [m, h, a] = ['match', 'home', 'away'].map((k) => (/^\d{1,9}$/.test(String(q[k] || '')) ? Number(q[k]) : null));
+  if (!m || !h || !a) { res.status(400).json({ error: 'Ungültiges Spiel' }); return; }
+  const settled = await Promise.allSettled([
+    getApp('matchEvents', { matchId: m }, TTL_LIVE),
+    getApp('matchTeamPlayer', { matchId: m, teamId: h }, 600),
+    getApp('matchTeamPlayer', { matchId: m, teamId: a }, 600),
+    getApp('matchStats', { matchId: m }, 600),
+  ]);
+  const val = (i) => (settled[i].status === 'fulfilled' ? settled[i].value : null);
+  if (settled.every((s) => s.status === 'rejected')) throw settled[0].reason;
+  const errors = [];
+  if (!val(0)) errors.push('Spielverlauf');
+  cacheHeader(res, TTL_LIVE);
+  res.status(200).json({
+    league: { key, name: al.name },
+    match: m,
+    events: val(0) ? app.mapEvents(val(0), h, a) : [],
+    lineups: { home: val(1) ? app.mapLineup(val(1)) : null, away: val(2) ? app.mapLineup(val(2)) : null },
+    stats: val(3) ? app.mapStats(val(3), h, a) : null,
+    errors,
+    fetchedAt: new Date().toISOString(),
+  });
+}
+
+async function handleNewsApp(al, key, res) {
+  const json = await getApp('news', { newsGroupId: al.news }, 300);
+  cacheHeader(res, 300);
+  res.status(200).json({ league: { key, name: al.name }, news: app.mapNews(json, al), fetchedAt: new Date().toISOString() });
 }
 
 function todayBerlin() {
@@ -174,8 +228,10 @@ async function handler(req, res) {
   let appError = null;
   const q = req.query || {};
   const key = String(q.league || '');
-  const lg = Object.prototype.hasOwnProperty.call(LEAGUES, key) ? LEAGUES[key] : null;
-  if (!lg) {
+  const has = (o) => Object.prototype.hasOwnProperty.call(o, key);
+  const al = has(app.LEAGUES) ? app.LEAGUES[key] : null; // Liga über die App-API
+  const lg = has(LEAGUES) ? LEAGUES[key] : null; // Liga über die Hockeyweb-Seiten (Rückfall)
+  if (!al) {
     res.status(400).json({ error: 'Unbekannte Liga' });
     return;
   }
@@ -189,23 +245,27 @@ async function handler(req, res) {
       const ok = new Set(['teamList', 'matchEvents', 'matchStats', 'matchTeamPlayer', 'news', 'roundsForSeason', 'currentMatches', 'teamRounds']);
       const rq = String(q.req || '');
       if (!ok.has(rq)) { res.status(400).json({ error: 'req' }); return; }
-      const extra = ['teamId', 'roundId', 'seasonId', 'matchId', 'leagueId', 'newsGroupId'].filter((k) => /^\d+$/.test(String(q[k] || ''))).map((k) => `${k}=${q[k]}`).join('&');
-      const u = `https://appdb.hockeyweb.de/v2/get/index.php?requests=${rq}${extra ? `&${extra}` : ''}&appVersion=203&linkVersion=2&android=1`;
-      const r = await fetch(app.sign(u, process.env.HOCKEYWEB_APP_KEY), { headers: { 'User-Agent': UA } });
+      const params = Object.fromEntries(['teamId', 'roundId', 'seasonId', 'matchId', 'leagueId', 'newsGroupId'].map((k) => [k, q[k]]));
+      const r = await fetch(app.apiUrl(rq, params, process.env.HOCKEYWEB_APP_KEY), { headers: { 'User-Agent': UA } });
       res.status(200).setHeader('Content-Type', 'application/json');
       res.end(await r.text());
       return;
     }
-    const viaApp = Object.prototype.hasOwnProperty.call(app.ROUNDS, key);
+    if (q.type === 'match' || q.type === 'news') {
+      if (q.type === 'match') await handleMatchApp(al, key, q, res); else await handleNewsApp(al, key, res);
+      return;
+    }
     if (q.type === 'standings') {
-      if (viaApp) { try { await handleStandingsApp(lg, key, q, res); return; } catch (e) { appError = e; } }
+      try { await handleStandingsApp(al, key, q, res); return; } catch (e) { appError = e; }
+      if (!lg) throw appError;
       await handleStandings(lg, key, res);
     } else {
-      if (viaApp) { try { await handleGamesApp(lg, key, date, res); return; } catch (e) { appError = e; } }
+      try { await handleGamesApp(al, key, date, q, res); return; } catch (e) { appError = e; }
+      if (!lg) throw appError;
       await handleGames(lg, key, date, res, appError ? ` (App-API: ${appError.message})` : '');
     }
   } catch (e) {
-    const why = appError ? ` (App-API: ${appError.message})` : '';
+    const why = appError && e !== appError ? ` (App-API: ${appError.message})` : '';
     res.status(502).json({ error: `${e?.message || 'Hockeyweb nicht erreichbar'}${why}` });
   }
 }

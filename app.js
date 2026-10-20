@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '2.2.0';
+  const VERSION = '2.3.0';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -51,6 +51,8 @@
     { id: 'nl', abbr: 'NL', name: 'NL (Schweiz)', cat: 'hockey', group: 'Europa', hockey: 'nl', color: '#ff3b3b' },
     { id: 'icehl', abbr: 'ICE', name: 'ICEHL', cat: 'hockey', group: 'Europa', hockey: 'icehl', color: '#ff6b6b' },
     { id: 'chl', abbr: 'CHL', name: 'CHL', cat: 'hockey', group: 'Europa', hockey: 'chl', color: '#ffb000' },
+    { id: 'shl', abbr: 'SHL', name: 'SHL', cat: 'hockey', group: 'Europa', hockey: 'shl', color: '#2fb0ff' },
+    { id: 'dcup', abbr: 'DCup', name: 'Deutschland-Cup', cat: 'hockey', group: 'Deutschland', hockey: 'dcup', color: '#e0483e' },
 
     { id: 'mlb', abbr: 'MLB', name: 'MLB', cat: 'baseball', group: 'Profis', sport: 'baseball', league: 'mlb', color: '#4a83e8' },
   ];
@@ -83,7 +85,7 @@
   const initialLeague = LEAGUES.find((l) => l.id === initialLeagueId);
   const state = {
     leagueId: initialLeagueId,
-    tab: initialLeagueId === FAV_ID ? 'scores' : (['scores', 'standings', 'news'].includes(saved.tab) && !(isOwnSource(initialLeague) && saved.tab === 'news') ? saved.tab : 'scores'),
+    tab: initialLeagueId === FAV_ID ? 'scores' : (['scores', 'standings', 'news'].includes(saved.tab) && !(initialLeague.amateur && saved.tab === 'news') ? saved.tab : 'scores'),
     date: defaultAnchor(initialLeague),
     top25Only: !!saved.top25Only,
     standingsConf: null, // Tabellen-Ansicht bei NCAAF/NCAAM: 'top25' oder ein Conference-Name
@@ -407,7 +409,7 @@
     const isFavView = !!lg.isFav;
     const isCollege = COLLEGE_IDS.has(state.leagueId);
     el.tabs.querySelectorAll('.tab').forEach((b) => {
-      const hide = (isFavView && b.dataset.tab !== 'scores') || (isOwnSource(lg) && b.dataset.tab === 'news');
+      const hide = (isFavView && b.dataset.tab !== 'scores') || (lg.amateur && b.dataset.tab === 'news');
       b.style.display = hide ? 'none' : '';
       const active = b.dataset.tab === state.tab;
       b.classList.toggle('active', active);
@@ -418,7 +420,7 @@
     el.source.textContent = lg.amateur
       ? 'Daten: Fussball.de (ausgelesen, ohne Torstände) · Zeiten laut Spielplan'
       : lg.hockey
-        ? 'Daten: Hockeyweb.de (ausgelesen) · Zeiten in deutscher Zeit'
+        ? 'Daten: Hockeyweb (App-Schnittstelle) · Zeiten in deutscher Zeit'
         : 'Daten: ESPN (inoffizielle öffentliche API) · Zeiten in deiner Ortszeit';
     el.top25Toggle.hidden = !isCollege || isFavView;
   }
@@ -1054,8 +1056,14 @@
     hockeyCache.set(qs, { t: Date.now(), data });
     return data;
   }
-  const hockeyGames = (lg, ymd) => hockeyFetch({ league: lg.hockey, type: 'games', date: ymd });
-  const hockeyStandings = (lg) => hockeyFetch({ league: lg.hockey, type: 'standings' });
+  // gewählte Runde je Liga (Hauptrunde, Playoffs …); leer = Hauptrunde
+  const hockeyRound = {};
+  let hockeyView = 'all'; // Tabelle: all | home | away
+  const withRound = (lg, p) => (hockeyRound[lg.id] ? { ...p, round: hockeyRound[lg.id] } : p);
+  const hockeyGames = (lg, ymd) => hockeyFetch(withRound(lg, { league: lg.hockey, type: 'games', date: ymd }));
+  const hockeyStandings = (lg) => hockeyFetch(withRound(lg, { league: lg.hockey, type: 'standings' }));
+  const hockeyNews = (lg) => hockeyFetch({ league: lg.hockey, type: 'news' });
+  const hockeyGameCache = new Map(); // "liga:spielId" → Spiel (für das Detail-Popup)
 
   const hwLogoOk = (url) => !!url && String(url).startsWith('https://media.hockeyweb.de/');
   const hwLogo = (url) => (hwLogoOk(url) ? `<img src="${esc(url)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '');
@@ -1066,7 +1074,11 @@
     if (!silent) { skeleton(state.tab === 'standings' ? 3 : 6); showStatus(''); }
     const lg = currentLeague();
     try {
-      if (state.tab === 'standings') {
+      if (state.tab === 'news') {
+        const data = await hockeyNews(lg);
+        if (id !== requestId) return;
+        el.content.innerHTML = hockeyNewsHtml(data);
+      } else if (state.tab === 'standings') {
         const data = await hockeyStandings(lg);
         if (id !== requestId) return;
         el.content.innerHTML = hockeyTableHtml(lg, data);
@@ -1112,10 +1124,14 @@
     const side = (t, dim) => ({
       name: t.name, favId: amTeamId(t.name),
       logoHtml: hwLogo(t.logo), logoUrl: hwLogoOk(t.logo) ? t.logo : '',
+      color: t.color, alt: t.alt,
       score: g.played || g.live ? t.score : null, dim,
     });
     const key = `${lg.id}:${amTeamId(`${g.date}-${g.home.name}-${g.away.name}`)}`;
+    const detail = g.id && g.home.id && g.away.id;
+    if (detail) hockeyGameCache.set(`${lg.id}:${g.id}`, g);
     return {
+      eventId: detail ? g.id : undefined,
       lgId: lg.id, state: g.played ? 'post' : g.live ? 'in' : 'pre',
       mid: g.time || 'offen',
       statusHtml: g.played ? `<span class="mc-final">${g.ot === 'PSO' ? 'Ende n.P.' : g.ot === 'OT' ? 'Ende n.V.' : 'Ende'}</span>` : g.live ? `<span class="live-badge">${esc(g.status || 'Live')}</span>` : `<span>${g.time ? 'Uhr' : 'Zeit offen'}</span>`,
@@ -1128,14 +1144,33 @@
     };
   }
 
+  // Rundenwahl (Hauptrunde, Playoffs …) – nur, wenn die Liga mehrere Runden hat
+  function hockeyRoundChips(lg, data, onlyTables) {
+    const rounds = (data.rounds || []).filter((r) => !onlyTables || r.type === 'table');
+    if (rounds.length < 2) return '';
+    return `<div class="hk-chips" role="group" aria-label="Runde">${rounds.map((r) => `<button type="button" class="hk-chip${r.id === data.round ? ' active' : ''}" data-hround="${esc(r.id)}">${esc(r.name.replace(new RegExp(`^${lg.name}\\s*`, 'i'), '') || r.name)}</button>`).join('')}</div>`;
+  }
+
+  function hockeyNewsHtml(data) {
+    const items = data.news || [];
+    if (!items.length) return '<div class="empty"><div class="empty-icon">📰</div>Keine News verfügbar.</div>';
+    const fmt = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    return `<div class="news">${items.map((n, i) => `
+      <a class="article${i === 0 ? ' lead' : ''}" href="${esc(n.link || '#')}" target="_blank" rel="noopener">
+        ${n.image ? `<img src="${esc(n.image)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}
+        <div class="article-body">${n.published ? `<time datetime="${esc(n.published)}">${esc(fmt.format(new Date(n.published)))} Uhr${n.category ? ` · ${esc(n.category)}` : ''}</time>` : ''}<h3>${esc(n.title)}</h3>${n.subTitle ? `<p><b>${esc(n.subTitle)}</b></p>` : ''}${n.description ? `<p>${esc(n.description)}</p>` : ''}</div>
+      </a>`).join('')}</div>`;
+  }
+
   function hockeyDayHtml(lg, data) {
     const day = toISODate(state.date);
+    const chips = hockeyRoundChips(lg, data, false);
     const warn = (data.errors || []).length ? `<div class="empty small">Teilweise nicht verfügbar: ${esc(data.errors.join(' · '))}</div>` : '';
     const games = (data.games || []).filter((g) => g.date === day).sort(byTime);
-    if (!games.length) return `${warn}<div class="empty"><div class="empty-icon">📅</div>Keine Spiele an diesem Tag.</div>`;
+    if (!games.length) return `${chips}${warn}<div class="empty"><div class="empty-icon">📅</div>Keine Spiele an diesem Tag.</div>`;
     const rank = (g) => (isFav(amTeamId(g.home.name), lg.id) || isFav(amTeamId(g.away.name), lg.id) ? 0 : 1);
     games.sort((a, b) => rank(a) - rank(b));
-    return `${warn}<h2 class="group-title"><span>${esc(fmtDayFor(state.date))}</span><a class="group-link" href="${esc(data.league.url)}" target="_blank" rel="noopener">Hockeyweb ↗</a></h2><div class="games">${games.map((g) => matchCard(hockeyModel(g, lg))).join('')}</div>`;
+    return `${chips}${warn}<h2 class="group-title"><span>${esc(fmtDayFor(state.date))}</span><a class="group-link" href="${esc(data.league.url)}" target="_blank" rel="noopener">Hockeyweb ↗</a></h2><div class="games">${games.map((g) => matchCard(hockeyModel(g, lg))).join('')}</div>`;
   }
 
   const HOCKEY_MARKS = {
@@ -1144,10 +1179,19 @@
   };
 
   function hockeyTableHtml(lg, data) {
-    const marks = HOCKEY_MARKS[lg.hockey] || [];
-    return data.groups.map((g, i) => {
+    const view = data.groups.some((g) => g.table.some((r) => r.home && r.away)) ? hockeyView : 'all';
+    const marks = view === 'all' ? HOCKEY_MARKS[lg.hockey] || [] : [];
+    const toggle = data.groups.some((g) => g.table.some((r) => r.home && r.away))
+      ? `<div class="hk-chips" role="group" aria-label="Ansicht">${[['all', 'Gesamt'], ['home', 'Heim'], ['away', 'Auswärts']].map(([v, l]) => `<button type="button" class="hk-chip${v === view ? ' active' : ''}" data-hview="${v}">${l}</button>`).join('')}</div>` : '';
+    return hockeyRoundChips(lg, data, true) + toggle + data.groups.map((g, i) => {
       const used = new Map();
-      const rows = g.table.map((r) => {
+      let list = g.table;
+      if (view !== 'all') {
+        list = g.table.filter((r) => r[view]).map((r) => ({ ...r, ...r[view] }))
+          .sort((a, b) => b.points - a.points || b.won - a.won || a.team.localeCompare(b.team));
+        list.forEach((r, n) => { r.rank = n + 1; });
+      }
+      const rows = list.map((r) => {
         const mk = marks.find(([from, to]) => r.rank >= from && r.rank <= to);
         if (mk) used.set(mk[2], mk[3]);
         const tid = amTeamId(r.team);
@@ -1155,7 +1199,7 @@
           <td>${mk ? `<span class="rank-mark" style="background:${mk[2]}"></span>` : ''}${esc(r.rank)}</td>
           <td class="team-cell">${starCell(tid, lg.id)}<span class="team-link">${hwLogo(r.logo)}<span>${esc(r.team)}</span></span></td>
           <td>${esc(r.played)}</td><td>${esc(r.won)}</td><td>${esc(r.otw)}</td><td>${esc(r.otl)}</td><td>${esc(r.lost)}</td>
-          <td>${esc(r.gf)}:${esc(r.ga)}</td><td>${esc(r.diff > 0 ? `+${r.diff}` : r.diff)}</td>
+          ${view === 'all' ? `<td>${esc(r.gf)}:${esc(r.ga)}</td><td>${esc(r.diff > 0 ? `+${r.diff}` : r.diff)}</td>` : ''}
           <td class="strong">${esc(r.points)}</td>
         </tr>`;
       }).join('');
@@ -1166,7 +1210,7 @@
         <div class="standings-group">
           <h2 class="group-title"><span>${esc(title)}</span>${i === 0 ? `<a class="group-link" href="${esc(data.league.url)}" target="_blank" rel="noopener">Hockeyweb ↗</a>` : ''}</h2>
           <div class="table-wrap"><table>
-            <thead><tr><th>#</th><th>Team</th><th>Sp</th><th>S</th><th>OTS</th><th>OTN</th><th>N</th><th>Tore</th><th>Diff</th><th>Pkt</th></tr></thead>
+            <thead><tr><th>#</th><th>Team</th><th>Sp</th><th>S</th><th>OTS</th><th>OTN</th><th>N</th>${view === 'all' ? '<th>Tore</th><th>Diff</th>' : ''}<th>Pkt</th></tr></thead>
             <tbody>${rows}</tbody>
           </table></div>
           <div class="legend">${legend}</div>
@@ -1282,7 +1326,7 @@
     state.leagueId = id;
     if (tab) state.tab = tab;
     if (lg.isFav) state.tab = 'scores';
-    if (isOwnSource(lg) && state.tab === 'news') state.tab = 'scores';
+    if (lg.amateur && state.tab === 'news') state.tab = 'scores';
     if (changed) { state.standingsConf = null; lastStandings = null; }
     if (lg.cat !== 'fav') { lastLeague[lg.cat] = id; writeJSON(LS_LAST, lastLeague); }
     persist();
@@ -1387,6 +1431,10 @@
       }
       return;
     }
+    const hr = e.target.closest('[data-hround]');
+    if (hr) { const lgH = currentLeague(); hockeyRound[lgH.id] = Number(hr.dataset.hround); snapHockey(lgH).then(() => { renderDate(); load(); }); return; }
+    const hv = e.target.closest('[data-hview]');
+    if (hv) { hockeyView = hv.dataset.hview; load(); return; }
     const go = e.target.closest('[data-goto-day]');
     if (go) { state.date = ymdToDate(go.dataset.gotoDay); load(); return; }
     const kreis = e.target.closest('[data-kreis]');
@@ -1415,6 +1463,11 @@
 
   function openGame(card) {
     const lg = leagueById(card.dataset.leagueId) || currentLeague();
+    if (lg.hockey) {
+      const g = hockeyGameCache.get(`${lg.id}:${card.dataset.event}`);
+      if (g) window.HockeyDetail.open(g, lg);
+      return;
+    }
     const event = eventCache.get(`${card.dataset.leagueId}:${card.dataset.event}`) || null;
     window.Gamecast.open(card.dataset.event, { link: card.dataset.link || null, league: { sport: lg.sport, league: lg.league, id: lg.id }, event });
   }
