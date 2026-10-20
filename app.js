@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '2.0.0';
+  const VERSION = '2.1.0';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -982,7 +982,7 @@
   }
 
   // ---------- Eishockey (Hockeyweb.de über /api/hockey) ----------
-  const HOCKEY_TTL_MS = 60_000;
+  const HOCKEY_TTL_MS = 20_000;
   const hockeyCache = new Map();
 
   async function hockeyFetch(params) {
@@ -1039,6 +1039,8 @@
     const now = new Date();
     const nowMin = now.getHours() * 60 + now.getMinutes();
     const running = (data.games || []).some((g) => {
+      if (g.live) return true; // App-API meldet laufende Spiele direkt
+      if (data.source === 'app') return false;
       if (g.date !== today || g.played || !g.time) return false;
       const [h, m] = g.time.split(':').map(Number);
       const diff = nowMin - (h * 60 + m);
@@ -1048,23 +1050,23 @@
     refreshTimer = setTimeout(() => {
       if (!document.hidden) loadHockey({ silent: true });
       else scheduleHockeyRefresh(data);
-    }, 60_000);
+    }, data.source === 'app' ? 30_000 : 60_000);
   }
 
   function hockeyModel(g, lg, showLeague = false) {
     const side = (t, dim) => ({
       name: t.name, favId: amTeamId(t.name),
       logoHtml: hwLogo(t.logo), logoUrl: hwLogoOk(t.logo) ? t.logo : '',
-      score: g.played ? t.score : null, dim,
+      score: g.played || g.live ? t.score : null, dim,
     });
     const key = `${lg.id}:${amTeamId(`${g.date}-${g.home.name}-${g.away.name}`)}`;
     return {
-      lgId: lg.id, state: g.played ? 'post' : 'pre',
+      lgId: lg.id, state: g.played ? 'post' : g.live ? 'in' : 'pre',
       mid: g.time || 'offen',
-      statusHtml: g.played ? `<span class="mc-final">${g.ot === 'PSO' ? 'Ende n.P.' : g.ot === 'OT' ? 'Ende n.V.' : 'Ende'}</span>` : `<span>${g.time ? 'Uhr' : 'Zeit offen'}</span>`,
+      statusHtml: g.played ? `<span class="mc-final">${g.ot === 'PSO' ? 'Ende n.P.' : g.ot === 'OT' ? 'Ende n.V.' : 'Ende'}</span>` : g.live ? `<span class="live-badge">${esc(g.status || 'Live')}</span>` : `<span>${g.time ? 'Uhr' : 'Zeit offen'}</span>`,
       home: side(g.home, g.played && g.home.score < g.away.score),
       away: side(g.away, g.played && g.away.score < g.home.score),
-      extra: g.played && g.periods?.length ? `<span><em>Drittel</em> ${g.periods.map(([a, b]) => `${esc(a)}:${esc(b)}`).join(' · ')}</span>` : '',
+      extra: (g.played || g.live) && g.periods?.length ? `<span><em>Drittel</em> ${g.periods.map(([a, b]) => `${esc(a)}:${esc(b)}`).join(' · ')}</span>` : '',
       link: g.url, linkLabel: g.played ? 'Spielbericht' : 'Hockeyweb',
       showLeague,
       pin: { key, lg: lg.id, day: g.date.replace(/-/g, ''), time: g.time || '', home: g.home.name, away: g.away.name },

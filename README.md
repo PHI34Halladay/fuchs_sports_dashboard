@@ -80,9 +80,10 @@ Unter 🏒 Eishockey stehen neben der NHL (ESPN) die Ligen DEL, DEL2, Oberliga S
 Aufbau wie bei den ESPN-Ligen: Tab „Spiele“ (Tagesansicht mit Datumsnavigation, Sprung von Spieltag zu Spieltag, Drittelergebnisse, n.V./n.P.),
 Tab „Tabelle“ (DEL/DEL2 mit Playoff-/Playdown-Markierungen) und Favoriten-★ (auch in der ★-Liga). Kein News-Tab.
 
-- Hockeyweb hat keine JSON-API; `api/hockey.js` liest die HTML-Seiten (Ergebnisse, Spielplan, Tabelle) aus. `api/_hockeyweb.js` enthält Ligenkonfiguration und Parser (`npm test` prüft ihn).
+- **Quelle 1: App-API** (`api/_hockeyapp.js`, appdb.hockeyweb.de) – wie die Hockeyweb-App: ganze Saison pro Aufruf, Live-Stand (Drittel, Zwischenstand). Die Anfragen sind signiert; der Signierschlüssel liegt **nicht im Repo**, sondern in der Vercel-Umgebungsvariable `HOCKEYWEB_APP_KEY` (Project Settings → Environment Variables, danach neu deployen). Rundenkennungen (`ROUNDS`) und `SEASON_ID` gelten für 2026/27 und müssen zur neuen Saison angepasst werden.
+- **Quelle 2 (Rückfall):** `api/hockey.js` liest die HTML-Seiten von hockeyweb.de aus (`api/_hockeyweb.js`), falls die App-API fehlt oder scheitert. Hockeyweb sperrt Server-IPs dort teils mit 403.
 - Spiele kommen wochenweise (Spielwochen); die Function liefert zusätzlich den Spielwochen-Kalender der Saison.
-- Antworten werden kurz im Edge-Netz gecacht (Spiele 60 s, Tabellen 10 min). Es gibt keinen Live-Status – laufende Spiele erscheinen erst mit Ergebnis.
+- Antworten werden kurz im Edge-Netz gecacht (Spiele 60 s, Tabellen 10 min). Live-Stand nur über die App-API; ohne sie erscheinen laufende Spiele erst mit Ergebnis.
 - Ändert Hockeyweb sein HTML, liefert die Function einen Fehler bzw. leere Listen – dann den Parser anpassen.
 
 ## Deployment

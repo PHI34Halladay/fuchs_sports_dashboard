@@ -1,6 +1,8 @@
 // Vercel Serverless Function: liest Spiele und Tabellen der Eishockey-Ligen von Hockeyweb.de.
 //   /api/hockey?league=del&type=games&date=2026-10-20   Spiele der Spielwoche(n), die das Datum enthalten
 //   /api/hockey?league=del&type=standings               Tabelle
+// Quelle 1: App-API von Hockeyweb (_hockeyapp.js, braucht HOCKEYWEB_APP_KEY, liefert Live-Stand).
+// Quelle 2 (Rückfall, falls die App-API fehlt/scheitert): die HTML-Seiten von Hockeyweb (_hockeyweb.js).
 // Erlaubt sind nur die Ligen aus LEAGUES (_hockeyweb.js) – kein offener Proxy.
 //
 // "games" liefert alle Spiele der Spielwoche zum Datum (gespielte aus "Ergebnisse", kommende aus
@@ -8,9 +10,11 @@
 // Spieltag springen kann. Antworten werden kurz im Edge-Netz gecacht, damit Hockeyweb geschont wird.
 
 const { LEAGUES, pageUrl, tableUrl, publicUrl, parseGames, parseWeeks, parseStandings } = require('./_hockeyweb');
+const app = require('./_hockeyapp');
 
-const UA = 'Mozilla/5.0 (compatible; sport-dashboard/1.11; privates Hobbyprojekt)';
+const UA = 'Mozilla/5.0 (compatible; sport-dashboard/1.12; privates Hobbyprojekt)';
 const TTL_GAMES = 60;
+const TTL_LIVE = 20;
 const TTL_TABLE = 600;
 const RE_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -28,6 +32,65 @@ async function get(url, ttlSec) {
   memo.set(url, { t: Date.now(), html });
   if (memo.size > 80) memo.delete(memo.keys().next().value);
   return html;
+}
+
+// Antwort der App-API (JSON) je Runde kurz zwischenspeichern; die Signatur ändert sich je Anfrage
+async function getApp(request, roundId, ttlSec) {
+  const key = process.env.HOCKEYWEB_APP_KEY;
+  if (!key) throw new Error('HOCKEYWEB_APP_KEY nicht gesetzt');
+  const ck = `app:${request}:${roundId}`;
+  const hit = memo.get(ck);
+  if (hit && Date.now() - hit.t < ttlSec * 1000) return hit.json;
+  const res = await fetch(app.apiUrl(request, roundId, key), {
+    headers: { 'User-Agent': UA, Accept: 'application/json' },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!res.ok) throw new Error(`App-API antwortet mit ${res.status}`);
+  const json = await res.json();
+  if (json?.status && json.status !== 'ok') throw new Error('App-API: ' + json.status);
+  memo.set(ck, { t: Date.now(), json });
+  if (memo.size > 80) memo.delete(memo.keys().next().value);
+  return json;
+}
+
+async function handleGamesApp(lg, key, date, res) {
+  const lgUrl = publicUrl(lg, 'spielplan');
+  const all = app.mapSchedule(await getApp('schedule', app.ROUNDS[key], TTL_LIVE), lgUrl);
+  if (!all.length) throw new Error('App-API ohne Spiele');
+  const games = all.filter((g) => g.date === date);
+  const live = games.some((g) => g.live);
+  const ttl = live ? TTL_LIVE : TTL_GAMES;
+  res.setHeader('Cache-Control', `public, s-maxage=${ttl}, stale-while-revalidate=${ttl * 3}`);
+  res.status(200).json({
+    league: { key, name: lg.name, url: lgUrl },
+    date,
+    games,
+    days: [...new Set(all.map((g) => g.date))].sort(),
+    calendar: [],
+    errors: [],
+    source: 'app',
+    fetchedAt: new Date().toISOString(),
+  });
+}
+
+async function handleStandingsApp(lg, key, q, res) {
+  const payload = await getApp('table', app.ROUNDS[key], TTL_TABLE);
+  let groups = app.mapTable(payload, lg.name);
+  let how = 'app';
+  if (!groups) {
+    const all = app.mapSchedule(await getApp('schedule', app.ROUNDS[key], TTL_LIVE), publicUrl(lg, 'spielplan'));
+    groups = app.computeTable(all, lg.name);
+    how = 'berechnet';
+  }
+  if (!groups.length) throw new Error('App-API ohne Tabelle');
+  res.setHeader('Cache-Control', `public, s-maxage=${TTL_TABLE}, stale-while-revalidate=${TTL_TABLE * 3}`);
+  const body = { league: { key, name: lg.name, url: tableUrl(lg) }, groups, source: how, fetchedAt: new Date().toISOString() };
+  if (q.debug) { // nur Aufbau zeigen (Feldnamen), keine Zugangsdaten
+    const t = payload?.table || {};
+    const rows = Array.isArray(t.table) ? t.table : Object.values(t.table || {});
+    body.debug = { tableKeys: Object.keys(t), isArray: Array.isArray(t.table), rowCount: rows.length, firstRow: rows[0] || null };
+  }
+  res.status(200).json(body);
 }
 
 function todayBerlin() {
@@ -52,7 +115,7 @@ async function loadSource(lg, kind, date) {
   return { weeks, games };
 }
 
-async function handleGames(lg, key, date, res) {
+async function handleGames(lg, key, date, res, hint = '') {
   const errors = [];
   const settled = await Promise.allSettled([loadSource(lg, 'ergebnisse', date), loadSource(lg, 'spielplan', date)]);
   const names = ['Ergebnisse', 'Spielplan'];
@@ -62,7 +125,7 @@ async function handleGames(lg, key, date, res) {
     else errors.push(`${names[i]}: ${r.reason?.message || 'nicht erreichbar'}`);
   });
   if (!parts.length) {
-    res.status(502).json({ error: errors.join(' · ') || 'Hockeyweb nicht erreichbar' });
+    res.status(502).json({ error: (errors.join(' · ') || 'Hockeyweb nicht erreichbar') + hint });
     return;
   }
 
@@ -108,6 +171,7 @@ async function handleStandings(lg, key, res) {
 }
 
 async function handler(req, res) {
+  let appError = null;
   const q = req.query || {};
   const key = String(q.league || '');
   const lg = Object.prototype.hasOwnProperty.call(LEAGUES, key) ? LEAGUES[key] : null;
@@ -121,10 +185,17 @@ async function handler(req, res) {
     return;
   }
   try {
-    if (q.type === 'standings') await handleStandings(lg, key, res);
-    else await handleGames(lg, key, date, res);
+    const viaApp = Object.prototype.hasOwnProperty.call(app.ROUNDS, key);
+    if (q.type === 'standings') {
+      if (viaApp) { try { await handleStandingsApp(lg, key, q, res); return; } catch (e) { appError = e; } }
+      await handleStandings(lg, key, res);
+    } else {
+      if (viaApp) { try { await handleGamesApp(lg, key, date, res); return; } catch (e) { appError = e; } }
+      await handleGames(lg, key, date, res, appError ? ` (App-API: ${appError.message})` : '');
+    }
   } catch (e) {
-    res.status(502).json({ error: e?.message || 'Hockeyweb nicht erreichbar' });
+    const why = appError ? ` (App-API: ${appError.message})` : '';
+    res.status(502).json({ error: `${e?.message || 'Hockeyweb nicht erreichbar'}${why}` });
   }
 }
 
