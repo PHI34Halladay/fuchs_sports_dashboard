@@ -5,6 +5,7 @@
 const BASE_SITE = 'https://site.api.espn.com/apis/site/v2/sports';
 const BASE_V2 = 'https://site.api.espn.com/apis/v2/sports';
 const BASE_WEB_COMMON = 'https://site.web.api.espn.com/apis/common/v3/sports';
+const BASE_SEARCH = 'https://site.web.api.espn.com/apis/search/v2';
 
 // Cache-Dauer (Sekunden) je Endpunkt
 const CACHE = {
@@ -16,6 +17,8 @@ const CACHE = {
   rankings: 300,
   team: 300,
   athlete: 300,
+  roster: 3600,
+  search: 600,
 };
 
 const RE_SPORT = /^[a-z-]{2,30}$/;
@@ -29,6 +32,13 @@ const RE_SEASONTYPE = /^\d{1}$/;
 function buildUrl(q) {
   const { type, sport, league } = q;
   if (!CACHE[type]) throw new Error('Unbekannter Typ');
+  // Suche ist ligaübergreifend (Spieler/Teams aller Sportarten) – ohne sport/league
+  if (type === 'search') {
+    const query = String(q.q || '').trim();
+    if (query.length < 2 || query.length > 40 || /[<>"'`\\]/.test(query)) throw new Error('Ungültige Suche');
+    const p = new URLSearchParams({ query, limit: '10' });
+    return `${BASE_SEARCH}?${p}`;
+  }
   if (!RE_SPORT.test(sport || '') || !RE_LEAGUE.test(league || '')) {
     throw new Error('Ungültige Sportart/Liga');
   }
@@ -66,11 +76,16 @@ function buildUrl(q) {
       break;
     case 'teams':
       url = `${BASE_SITE}/${sport}/${league}/teams`;
+      params.set('limit', '1000');
       break;
     case 'team':
       if (!RE_ID.test(q.id || '')) throw new Error('Ungültige Team-ID');
       url = `${BASE_SITE}/${sport}/${league}/teams/${q.id}`;
       params.set('enable', 'nextEvent');
+      break;
+    case 'roster':
+      if (!RE_ID.test(q.id || '')) throw new Error('Ungültige Team-ID');
+      url = `${BASE_SITE}/${sport}/${league}/teams/${q.id}/roster`;
       break;
     case 'athlete':
       if (!RE_ID.test(q.id || '')) throw new Error('Ungültige Athlet-ID');

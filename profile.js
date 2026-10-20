@@ -6,7 +6,7 @@
 (() => {
   'use strict';
 
-  let ctx = null; // { api, esc }
+  let ctx = null; // { api, esc, fav: { get(teamId, league), toggle(teamId, league) } }
   let reqId = 0;
   let activeLeague = null; // { sport, league } – Kontext für verschachtelte Klicks (Team-Chip, nächstes Spiel)
 
@@ -33,6 +33,13 @@
   dlg.addEventListener('click', (e) => {
     if (e.target === dlg) { close(); return; }
     if (e.target.closest('.pf-close')) { close(); return; }
+    const fs = e.target.closest('[data-pf-fav]');
+    if (fs) {
+      e.stopPropagation();
+      const on = ctx.fav?.toggle(fs.dataset.pfFav, activeLeague);
+      if (on != null) { fs.classList.toggle('on', on); fs.textContent = on ? '★ Favorit' : '☆ Als Favorit'; }
+      return;
+    }
     const t = e.target.closest('[data-team-id]');
     if (t) { e.stopPropagation(); openTeam(t.dataset.teamId); return; }
     const p = e.target.closest('[data-player-id]');
@@ -96,9 +103,12 @@
     if (league) activeLeague = league;
     const myId = startLoad();
     try {
-      const data = await ctx.api('team', { id }, activeLeague);
+      const [data, roster] = await Promise.all([
+        ctx.api('team', { id }, activeLeague),
+        ctx.api('roster', { id }, activeLeague).catch(() => null),
+      ]);
       if (myId !== reqId) return;
-      renderTeam(data.team || {});
+      renderTeam(data.team || {}, roster);
     } catch (e) {
       if (myId !== reqId) return;
       $body.innerHTML = `<div class="status error">Teamdaten konnten nicht geladen werden: ${ctx.esc(e.message)}</div>`;
@@ -158,9 +168,11 @@
   // ---------- Team-Ansicht ----------
   const RECORD_LABELS = { total: 'Gesamt', home: 'Heim', road: 'Auswärts', away: 'Auswärts' };
 
-  function renderTeam(t) {
+  function renderTeam(t, roster) {
     setAccent(t.color, t.alternateColor);
     const logo = bestLogo(t.logos, t.logo);
+    const favOn = ctx.fav?.get(t.id, activeLeague);
+    const favBtn = favOn == null ? '' : `<button type="button" class="pf-fav${favOn ? ' on' : ''}" data-pf-fav="${ctx.esc(t.id)}">${favOn ? '★ Favorit' : '☆ Als Favorit'}</button>`;
 
     $head.innerHTML = `
       <div class="pf-team-head">
@@ -168,6 +180,7 @@
         <div class="pf-info">
           <div class="pf-name">${ctx.esc(t.displayName || t.name || '')}</div>
           <div class="pf-sub">${ctx.esc(t.standingSummary || '')}</div>
+          ${favBtn}
         </div>
       </div>`;
 
@@ -188,10 +201,30 @@
       </div>`);
     }
 
-    $body.innerHTML = (recHtml + nextHtml) || '<div class="gc-empty">Für dieses Team liegen keine weiteren Daten vor.</div>';
+    $body.innerHTML = (recHtml + nextHtml + rosterHtml(roster)) || '<div class="gc-empty">Für dieses Team liegen keine weiteren Daten vor.</div>';
 
     const web = (t.links || []).find((l) => (l.rel || []).includes('clubhouse')) || (t.links || [])[0];
     if (web?.href) $body.insertAdjacentHTML('beforeend', `<div class="gc-foot"><a href="${ctx.esc(web.href)}" target="_blank" rel="noopener">Auf ESPN öffnen ↗</a></div>`);
+  }
+
+  // Kader: ESPN liefert entweder eine flache Spielerliste (NBA, Fußball) oder nach
+  // Positionsgruppen geordnet (NFL, NHL, MLB: [{ position, items: [...] }])
+  const GROUP_DE = { offense: 'Offense', defense: 'Defense', specialTeam: 'Special Teams', centers: 'Center', forwards: 'Stürmer', defensemen: 'Verteidiger', goalies: 'Torhüter', pitchers: 'Pitcher', catchers: 'Catcher', infielders: 'Infield', outfielders: 'Outfield', designatedHitter: 'Designated Hitter' };
+  function rosterHtml(r) {
+    const raw = r?.athletes || [];
+    if (!raw.length) return '';
+    const groups = raw[0]?.items ? raw.map((g) => ({ name: GROUP_DE[g.position] || g.position || '', list: g.items || [] })) : [{ name: '', list: raw }];
+    const posOrder = { G: 0, GK: 0, D: 1, M: 2, F: 3 };
+    const body = groups.map((g) => {
+      const list = g.list.slice().sort((a, b) => (posOrder[a.position?.abbreviation] ?? 5) - (posOrder[b.position?.abbreviation] ?? 5) || (+a.jersey || 99) - (+b.jersey || 99));
+      return `${g.name ? `<div class="gc-box-group">${ctx.esc(g.name)}</div>` : ''}<div class="pf-roster">${list.map((a) => `
+        <button type="button" class="pf-rp" data-player-id="${ctx.esc(a.id)}">
+          ${a.headshot?.href ? `<img src="${ctx.esc(a.headshot.href)}" alt="" loading="lazy">` : '<span class="pf-rp-ph"></span>'}
+          <span class="pf-rp-num">${ctx.esc(a.jersey || '')}</span>
+          <span class="pf-rp-name">${ctx.esc(a.displayName || a.fullName || '')}<small>${ctx.esc(a.position?.abbreviation || '')}</small></span>
+        </button>`).join('')}</div>`;
+    }).join('');
+    return section(`Kader <span class="muted">· ${groups.reduce((n, g) => n + g.list.length, 0)} Spieler</span>`, body);
   }
 
   window.Profile = {

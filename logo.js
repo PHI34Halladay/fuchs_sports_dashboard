@@ -92,3 +92,117 @@ window.LogoPref = (() => {
 
   return { resolve, toggle, isDark, img };
 })();
+
+/* Teamfarben: ESPN liefert Primär-/Alternativfarbe je Team. Für Fussball.de- und
+ * Hockeyweb-Vereine gibt es keine Farben – dort wird die Hauptfarbe aus dem Vereinslogo
+ * gelesen (Canvas, Logo über /api/logo unter eigener Domain) und im Browser gespeichert.
+ */
+window.TeamColor = (() => {
+  'use strict';
+  const KEY = 'sd:logocolors';
+  let cache;
+  try { cache = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { cache = {}; }
+  const pending = new Map();
+
+  function norm(c) {
+    const s = String(c || '').replace(/^#/, '');
+    return /^[0-9a-f]{6}$/i.test(s) ? `#${s.toLowerCase()}` : null;
+  }
+  function rgb(hex) { const n = parseInt(hex.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+  function lum(hex) {
+    return rgb(hex).map((v) => v / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+      .reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+  }
+  function dist(a, b) {
+    if (!a || !b) return 999;
+    const [x, y] = [rgb(a), rgb(b)];
+    return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]);
+  }
+  // Primärfarbe bevorzugen; reines Schwarz/Weiß wirkt als Kartenfarbe leer → dann Alternativfarbe
+  function pick(primary, alt) {
+    const p = norm(primary), a = norm(alt);
+    if (p && lum(p) > 0.012 && lum(p) < 0.82) return p;
+    if (a && lum(a) > 0.012 && lum(a) < 0.82) return a;
+    return p || a || null;
+  }
+  // Zwei Teams mit (fast) gleicher Farbe: beim Gast auf die Alternativfarbe ausweichen
+  function pair(home, away) {
+    const h = pick(home?.color, home?.alt);
+    let w = pick(away?.color, away?.alt);
+    if (h && w && dist(h, w) < 70) {
+      const alt = norm(away?.alt);
+      w = alt && dist(h, alt) >= 70 ? alt : '#5b6472';
+    }
+    return [h, w];
+  }
+
+  function proxied(url) {
+    return /^https:\/\/(www\.fussball\.de\/export\.media|media\.hockeyweb\.de)\//.test(url || '') ? `/api/logo?u=${encodeURIComponent(url)}` : null;
+  }
+
+  // Häufigste "bunte" Farbe des Logos (Weiß, Schwarz und Grautöne zählen kaum)
+  function extract(img) {
+    const N = 40;
+    const cv = document.createElement('canvas');
+    cv.width = N; cv.height = N;
+    const g = cv.getContext('2d', { willReadFrequently: true });
+    g.drawImage(img, 0, 0, N, N);
+    const px = g.getImageData(0, 0, N, N).data;
+    const buckets = new Map();
+    for (let i = 0; i < px.length; i += 4) {
+      const [r, gg, b, al] = [px[i], px[i + 1], px[i + 2], px[i + 3]];
+      if (al < 200) continue;
+      const mx = Math.max(r, gg, b), mn = Math.min(r, gg, b);
+      const sat = mx ? (mx - mn) / mx : 0;
+      if (mx > 235 && sat < 0.12) continue; // weiß
+      if (mx < 28) continue;                // schwarz
+      const w = sat < 0.18 ? 0.15 : 1 + sat;
+      const k = `${r >> 5}-${gg >> 5}-${b >> 5}`;
+      const e = buckets.get(k) || { w: 0, r: 0, g: 0, b: 0, n: 0 };
+      e.w += w; e.r += r; e.g += gg; e.b += b; e.n++;
+      buckets.set(k, e);
+    }
+    let best = null;
+    for (const e of buckets.values()) if (!best || e.w > best.w) best = e;
+    if (!best || best.n < 6) return null;
+    const h = (v) => Math.round(v / best.n).toString(16).padStart(2, '0');
+    return `#${h(best.r)}${h(best.g)}${h(best.b)}`;
+  }
+
+  function fromLogo(url) {
+    if (!url) return Promise.resolve(null);
+    if (url in cache) return Promise.resolve(cache[url]);
+    const src = proxied(url);
+    if (!src) return Promise.resolve(null);
+    if (pending.has(url)) return pending.get(url);
+    const p = new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        let c = null;
+        try { c = extract(img); } catch { c = null; }
+        cache[url] = c;
+        try { localStorage.setItem(KEY, JSON.stringify(cache)); } catch { /* egal */ }
+        resolve(c);
+      };
+      img.onerror = () => resolve(null);
+      img.src = src;
+    });
+    pending.set(url, p);
+    return p;
+  }
+
+  // Karten ohne bekannte Farbe (data-lc-home/-away = Logo-URL) nachträglich einfärben
+  function paint(root) {
+    (root || document).querySelectorAll('[data-lc-home],[data-lc-away]').forEach((el) => {
+      ['home', 'away'].forEach((side) => {
+        const url = el.getAttribute(`data-lc-${side}`);
+        if (!url) return;
+        el.removeAttribute(`data-lc-${side}`);
+        fromLogo(url).then((c) => { if (c) el.style.setProperty(`--c-${side}`, c); });
+      });
+    });
+  }
+  const cached = (url) => (url && cache[url]) || null;
+
+  return { norm, pick, pair, lum, dist, fromLogo, paint, cached };
+})();

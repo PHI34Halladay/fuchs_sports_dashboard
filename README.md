@@ -3,34 +3,21 @@
 Browser-App, die Spielstände, Tabellen und News aus der öffentlichen ESPN-API anzeigt.
 Gehostet auf Vercel, Code auf GitHub – ohne Build-Schritt, ohne Abhängigkeiten.
 
-## Funktionen
+## Funktionen (Version 2)
 
-- **Ligen:** NFL, NBA, MLB, NHL, NCAAF, NCAAM, Bundesliga, 2. Bundesliga, Premier League, La Liga, Ligue 1, Serie A, MLS, Champions League, Europa League, Conference League sowie – über Hockeyweb – im Dropdown „🏒 Eishockey“: DEL, DEL2, Oberliga Süd, Oberliga Nord, NL (Schweiz), ICEHL, CHL
-  (die zehn Fußball-Wettbewerbe sind in der Navigation unter einem „⚽ Fußball“-Dropdown zusammengefasst, damit die Leiste übersichtlich bleibt)
-- **★ Favoriten-Liga:** ganz vorne in der Liga-Leiste; zeigt die Spiele aller favorisierten Teams aus allen Ligen gemeinsam an einem Tag (nur Spiele-Ansicht, da ligaübergreifend – Tabelle/News ergeben hier keinen Sinn)
-- **Spiele:** Live-Stände (Auto-Refresh alle 30 s bei laufenden Spielen), Anstoßzeiten in Ortszeit, Bilanz, Top-Performer, TV-Sender, Link zum ESPN-Gamecast
-- **Datumsnavigation:** Tag vor/zurück oder Datum wählen; es wird immer ein konkretes Datum angezeigt, standardmäßig der heutige Tag. Bei den US-Ligen (NFL, NBA, MLB, NHL, NCAAF, NCAAM) wird der Spieltag anhand der US-Ostküstenzeit (Eastern Time) bestimmt statt der deutschen Kalendertage, damit ein Spiel in der Nacht von Samstag auf Sonntag (deutscher Zeit) weiterhin korrekt als Samstagsspiel geführt wird. Tag-vor/-zurück überspringt automatisch spielfreie Tage der jeweiligen Liga (z. B. bei der NFL direkt von Spieltag zu Spieltag statt Tag für Tag durch die Woche); beim Wechsel auf eine andere Liga springt das Datum direkt auf den heutigen oder, falls heute kein Spiel stattfindet, den nächsten Spieltag dieser Liga. Die Datumsanzeige ist bei allen Ligen gleich groß
-- **Top 25 (nur NCAAF/NCAAM):** Nur bei den College-Ligen erscheint neben der Datumsanzeige ein „Top 25”-Schalter; aktiviert, filtert er die Spiele-Liste auf Partien mit mindestens einem Team aus den aktuellen AP Top 25 (anhand von ESPNs `curatedRank`, ohne zusätzlichen API-Aufruf)
-- **Favoriten:** Stern neben einem Team setzen → Spiele werden hervorgehoben und oben einsortiert, zusätzlich in der ★-Liga ligaübergreifend gebündelt
-- **Dunkle Logo-Variante:** Manche ESPN-Logos (z. B. Ohio State) sehen in der eigens fürs Dunkelmodus aufbereiteten Variante besser aus. Langer Druck (Touch oder Maus) auf ein Team-Logo schaltet pro Team dauerhaft auf diese Variante um – die Einstellung wird im Browser gespeichert (`localStorage`) und gilt überall in der App, wo das Logo dieses Teams erscheint (Spielkarten, Tabellen, Gamecast, Profil-Popups)
-- **Design:** Hintergrund der App komplett schwarz
-- **Auto-Reload:** Schalter im Footer – lädt die Seite alle 30 Sekunden automatisch neu, solange sie geöffnet ist (z. B. für einen dauerhaft angezeigten Bildschirm); Einstellung bleibt gespeichert
-- **Tabellen:** je Liga passende Spalten, Conferences/Gruppen getrennt, Qualifikations-Markierungen im Fußball. Bei NCAAF/NCAAM (zu viele Conferences für eine gemeinsame Ansicht) per Dropdown wählbar, vorbelegt mit „Top 25“
-- **News:** aktuelle Artikel und Videos je Liga
-- **Spiel-Popup (Klick auf eine Karte):**
-  - *NHL:* Gamecast mit Three Stars, Torfolge (inkl. PP/SH/EN), Shot Chart nach Drittel, Teamstatistik-Vergleich, Strafen, Spielinfo · Play-by-Play (filterbar) · Boxscore (Stürmer, Verteidiger, Torhüter) · Spielbericht
-  - *MLB:* Gamecast mit Pitching-Entscheidung (Gewinner/Save/Verlierer), Punktefolge nach Inning, Linescore inkl. Hits/Errors, Teamstatistik-Vergleich · Play-by-Play (filterbar, auch pitch-genau) · Boxscore (Schlagleute, Pitcher) · Spielbericht
-  - *NFL/NCAAF:* Gamecast mit Spielstand-Verlauf (TD/FG-Badges), Teamstatistik-Vergleich, Topspielern (Passing/Rushing/Receiving) · Drives (Drive-Ergebnis oder mit allen Spielzügen, filterbar nach Viertel) · Boxscore (Passing, Rushing, Receiving, Defense, Kicking) · Spielbericht; bei NCAAF Ranking-Badge (#Rang) neben Top-25-Teams
-  - *Fußball (alle 7 Ligen):* Spielbericht mit Torschützen (inkl. Eigentore), Teamstatistik-Vergleich (Ballbesitz, Schüsse, Pässe, Flanken, Zweikämpfe, Fouls, Karten, Abseits), Spielinfo (Stadion, Zuschauer, Schiedsrichter) · **Aufstellungen**: Startelf und Ersatzbank beider Teams nach Position sortiert, mit Rückennummer, Ein-/Auswechslungs-Hinweis und Tor-/Vorlagen-/Karten-Badges – jeder Spielername verlinkt direkt ins Spieler-Popup. (ESPNs öffentliche API liefert bei Fußball keine minutengenauen Torereignisse wie bei den US-Ligen, daher ohne Spielminute.)
-  - *Videos:* Highlight-Clips direkt im Popup abspielbar, wenn ESPN welche zum Spiel anbietet (NHL, MLB, NFL/NCAAF, Fußball und weitere Ligen)
-  - *Vor Spielbeginn (alle Ligen):* Vorschau mit Saisonduell, Form, voraussichtlichen Torhütern/Pitchern, Topspielern, Ausfällen
-  - *Andere Ligen:* allgemeine Übersicht (Linescore, Teamstatistik, Videos, Spielbericht) – eigene Ansichten folgen
-  - Laufende Spiele aktualisieren sich im Popup alle 30 s
-- **Spieler- & Team-Popups:** Jeder Spielername (Boxscore, Three Stars/Pitching-Entscheidung, Torfolge, Aufstellung, Topspieler, Vorschau) und jedes Team (Teamname auf der Spielkarte, Gamecast-Kopf, Tabellen, Top 25) ist anklickbar und öffnet ein eigenes Profil-Popup, auch aus der ★-Favoriten-Ansicht heraus mit korrektem Liga-Kontext. Auf der Spielkarte ist nur der Teamname selbst klickbar (nicht die ganze Zeile) – der übrige Platz der Zeile öffnet das Spiel:
-  - *Spieler:* Foto, Rückennummer/Position, Status, Körpergröße/-gewicht, Alter, Geburtsort, Erfahrung, Draft, Hand, aktuelle Saisonstatistik, Verletzungsstatus
-  - *Team:* Logo, Tabellenplatz, Bilanz (gesamt/Heim/Auswärts), nächstes Spiel – eingefärbt in den Vereinsfarben des Teams (Akzentfarbe & Kopfbereich-Verlauf), damit jedes Team-Popup individuell wirkt
-  - Aus dem Spieler-Popup heraus ist das Team ebenfalls anklickbar (verschachteltes Popup)
-- Versionsnummer unten auf der Seite
+- **Navigation in zwei Ebenen:** oben die Sportarten (★ Favoriten · ⚽ Fußball · 🏈 Football · 🏀 Basketball · 🏒 Eishockey · ⚾ Baseball – auf dem Handy als App-Leiste am unteren Bildschirmrand), darunter die Ligen der gewählten Sportart, nach Regionen gruppiert (z. B. Fußball: *Deutschland* Bundesliga, 2. Bundesliga, Kreisliga · *Europapokal* CL/EL/ECL · *Topligen* · *Amerika*). Jede Liga hat eine eigene Akzentfarbe, die Kopfbereich, Tabs und Hintergrund-Glow einfärbt. Die zuletzt gewählte Liga je Sportart wird gemerkt.
+- **Kreisliga:** SGM I und SGM II (Fussball.de) sind als eine Liga „Kreisliga“ unter Fußball zusammengefasst; Umschalter *Beide / SGM I / SGM II*, Spiele und Tabellen beider Staffeln untereinander.
+- **Spielkarten in Teamfarben:** diagonaler Farbverlauf von links oben (Heimteam) nach rechts unten (Gastteam) mit neutralem Balken in der Mitte, Heim links / Gast rechts, Ergebnis bzw. Anstoßzeit im neutralen Balken. Bei ESPN kommen die Farben aus der API (zu ähnliche Farben → Alternativfarbe beim Gast); bei Fussball.de und Hockeyweb wird die Hauptfarbe aus dem Vereinslogo gelesen (über `/api/logo`, im Browser gespeichert). Live-Spiele pulsieren rot, Favoriten-Spiele haben einen goldenen Rahmen.
+- **Suche** (Lupe oben rechts, Taste `/` oder `Strg+K`): findet Ligen, Teams aller Ligen (ESPN-Teamlisten, Kreisliga- und Hockeyweb-Tabellen) und Spieler über die ESPN-Suche. Teams lassen sich direkt in der Trefferliste per ★ favorisieren; Auswahl öffnet das Team- bzw. Spielerprofil (Kreisliga/Eishockey: Tabelle mit hervorgehobenem Team).
+- **Favoriten:** ★ an einem Team (Karte, Tabelle, Suche, Teamprofil) · 🔖 an einer Spielkarte merkt **einzelne Spiele**. Die Favoriten-Ansicht zeigt eine Leiste aller gemerkten Spiele (Antippen springt zum Spieltag, × entfernt) und darunter alle Spiele des Tages mit Favoriten-Teams oder gemerkten Spielen aus allen Ligen. Gemerkte Spiele älter als 45 Tage werden automatisch entfernt.
+- **Spiele:** Live-Stände (Auto-Refresh alle 30 s), Anstoßzeiten in Ortszeit, Bilanz, Top-Performer, TV-Sender, Datumsnavigation mit Sprung von Spieltag zu Spieltag (US-Ligen nach US-Ostküstenzeit), „Heute“-Knopf, Top-25-Filter bei NCAAF/NCAAM.
+- **Spiel-Popup** (Klick auf eine ESPN-Karte), Kopfbereich ebenfalls in Teamfarben:
+  - *Basketball (NBA/NCAAM) – neu:* Gamecast mit Topspielern (Punkte/Rebounds/Assists mit Foto), **Spielverlauf-Diagramm** (Punktedifferenz oder ESPN-Siegwahrscheinlichkeit), **Wurfkarte** auf dem Feld (Treffer/Fehlwürfe je Team, filterbar nach Viertel und Team, Trefferquoten), Teamstatistik (FG, 3er, FT, Rebounds, Assists, Steals, Blocks, Ballverluste, Fastbreak, Zone, größte Führung), letzte Aktionen bei Live-Spielen, Quoten, Divisionstabelle, Spielinfo · Play-by-Play (filterbar) · Boxscore (Starting Five, Bank mit DNP-Grund, Teamsumme, +/-).
+  - *Fußball – neu:* **Spielverlauf** mit Minute (Tore mit Vorlage und Zwischenstand, Elfmeter, Eigentore, Karten, Wechsel – Heim links, Gast rechts) · **Aufstellung auf dem Spielfeld** nach ESPN-Formation (z. B. 4-2-3-1) mit Rückennummer in Teamfarbe, Tor-/Karten-/Auswechsel-Markern, Bank mit Einwechselminute (Desktop quer, Handy hochkant) · **Liveticker** (ESPN-Kommentar). Aufstellungen erscheinen auch schon vor Anpfiff, sobald ESPN sie liefert.
+  - *NHL, MLB, NFL/NCAAF:* wie bisher (Gamecast, Play-by-Play/Drives, Boxscore, Spielbericht, Videos).
+  - *Vor Spielbeginn (alle Ligen):* Vorschau mit Saisonduell, Form, Torhütern/Pitchern, Topspielern, Ausfällen, Prognose & Quoten, Tabelle.
+- **Spieler- & Team-Popups:** Teamprofil in Vereinsfarben mit ★-Favoritenknopf, Bilanz, nächstem Spiel und **Kader** (Spieler antippen → Spielerprofil).
+- **Dunkle Logo-Variante** per langem Druck auf ein Logo (pro Team gespeichert), **Auto-Reload**-Schalter im Footer, Versionsnummer unten.
 
 ## Aufbau
 
@@ -41,9 +28,12 @@ espn-dashboard/
 ├── app.js          Frontend-Logik
 ├── gamecast.js     Spiel-Popup (Gamecast, Boxscore, Bericht)
 ├── profile.js      Spieler-/Team-Popup (Profilseite, Teamfarben als Akzent)
-├── logo.js         Gemeinsame Logo-Hilfe (Dark-Mode-Präferenz pro Team, Long-Press-Umschaltung)
+├── logo.js         Logo-Hilfe (Dark-Variante per Long-Press) + Teamfarben (TeamColor, Farbe aus Logo)
 ├── api/
-│   └── espn.js     Vercel-Function: Proxy zur ESPN-API (CORS + Caching)
+│   ├── espn.js     Vercel-Function: Proxy zur ESPN-API (CORS + Caching, inkl. Suche & Kader)
+│   ├── logo.js     Reicht Fussball.de-/Hockeyweb-Logos durch (für die Farberkennung)
+│   ├── amateur.js  Fussball.de (Kreisliga)
+│   └── hockey.js   Hockeyweb (Eishockey Europa)
 ├── vercel.json     Vercel-Einstellungen
 └── package.json
 ```
@@ -63,11 +53,13 @@ Verwendete ESPN-Endpunkte:
 | rankings | `site.api.espn.com/apis/site/v2/sports/{sport}/{league}/rankings` (AP Top 25 für NCAAF/NCAAM) |
 | team | `site.api.espn.com/apis/site/v2/sports/{sport}/{league}/teams/{id}` (Team-Popup) |
 | athlete | `site.web.api.espn.com/apis/common/v3/sports/{sport}/{league}/athletes/{id}` (Spieler-Popup) |
+| roster | `site.api.espn.com/apis/site/v2/sports/{sport}/{league}/teams/{id}/roster` (Kader im Team-Popup) |
+| search | `site.web.api.espn.com/apis/search/v2?query=…` (Spieler-/Teamsuche, ligaübergreifend) |
 
-## Amateurfußball (SGM I / SGM II)
+## Kreisliga (SGM I / SGM II)
 
-Zwei Mannschaften der SGM FC Gündelbach/TSV Häfnerhaslach erscheinen als eigene Buttons („SGM I“, „SGM II“)
-neben dem Favoriten-Stern. Tab „Spiele“ funktioniert wie bei den ESPN-Ligen (Tagesansicht mit Datumsnavigation,
+Zwei Mannschaften der SGM FC Gündelbach/TSV Häfnerhaslach erscheinen gemeinsam als Liga „Kreisliga“ unter Fußball
+(Umschalter Beide / SGM I / SGM II; in `LEAGUES` in `app.js`: `teams: ['sgm1', 'sgm2']`). Tab „Spiele“ funktioniert wie bei den ESPN-Ligen (Tagesansicht mit Datumsnavigation,
 Sprung zum nächsten Tag mit Spielen; Team-Favoriten per ★, auch in der ★-Ansicht), Tab „Tabelle“ zeigt die Liga-Tabelle
 (Platz 1 grün, Platz 2 gelb). Daten von Fussball.de: Die Tagesansicht zeigt alle Spiele der Liga (Spielpläne aller Mannschaften der Tabelle
 werden zusammengeführt, 30 Min. Cache); Spiele der eigenen Mannschaft sind markiert. Vereinslogos kommen
@@ -84,7 +76,7 @@ vom Fussball.de-Logodienst (Hotlink).
 
 ## Eishockey (Hockeyweb)
 
-Das Dropdown „🏒 Eishockey“ in der Liga-Leiste enthält DEL, DEL2, Oberliga Süd, Oberliga Nord, NL (Swiss National League), ICEHL und CHL.
+Unter 🏒 Eishockey stehen neben der NHL (ESPN) die Ligen DEL, DEL2, Oberliga Süd, Oberliga Nord (Gruppe Deutschland) sowie NL (Schweiz), ICEHL und CHL (Gruppe Europa).
 Aufbau wie bei den ESPN-Ligen: Tab „Spiele“ (Tagesansicht mit Datumsnavigation, Sprung von Spieltag zu Spieltag, Drittelergebnisse, n.V./n.P.),
 Tab „Tabelle“ (DEL/DEL2 mit Playoff-/Playdown-Markierungen) und Favoriten-★ (auch in der ★-Liga). Kein News-Tab.
 
@@ -116,13 +108,11 @@ Dann `http://localhost:3000` öffnen. (Einfaches Öffnen der `index.html` reicht
 In `app.js` die Liste `LEAGUES` erweitern, z. B.:
 
 ```js
-{ id: 'ucl', name: 'Champions League', sport: 'soccer', league: 'uefa.champions' },
-{ id: 'wnba', name: 'WNBA', sport: 'basketball', league: 'wnba' },
+{ id: 'por', name: 'Liga Portugal', cat: 'soccer', group: 'Topligen', sport: 'soccer', league: 'por.1', color: '#1fa463' },
+{ id: 'wnba', name: 'WNBA', cat: 'basketball', group: 'Profis', sport: 'basketball', league: 'wnba', color: '#ff6f3c' },
 ```
 
-Jeder Eintrag mit `sport: 'soccer'` erscheint automatisch im „⚽ Fußball“-Dropdown
-(`SOCCER_LEAGUES` in `app.js` wird direkt aus `LEAGUES` gefiltert) – für eine weitere
-Fußball-Liga reicht also ein zusätzlicher Eintrag wie oben.
+`cat` bestimmt die Sportart (obere Leiste), `group` den Abschnitt in der Ligaleiste, `color` die Akzentfarbe.
 
 ## Hinweis
 
