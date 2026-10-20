@@ -185,6 +185,17 @@ async function handler(req, res) {
     return;
   }
   try {
+    if (q.type === 'raw' && process.env.HOCKEYWEB_DEBUG === '1') { // TEMPORÄR: nur zum Erkunden
+      const ok = new Set(['teamList', 'matchEvents', 'matchStats', 'matchTeamPlayer', 'news', 'roundsForSeason', 'currentMatches', 'teamRounds']);
+      const rq = String(q.req || '');
+      if (!ok.has(rq)) { res.status(400).json({ error: 'req' }); return; }
+      const extra = ['teamId', 'roundId', 'seasonId', 'matchId', 'leagueId', 'newsGroupId'].filter((k) => /^\d+$/.test(String(q[k] || ''))).map((k) => `${k}=${q[k]}`).join('&');
+      const u = `https://appdb.hockeyweb.de/v2/get/index.php?requests=${rq}${extra ? `&${extra}` : ''}&appVersion=203&linkVersion=2&android=1`;
+      const r = await fetch(app.sign(u, process.env.HOCKEYWEB_APP_KEY), { headers: { 'User-Agent': UA } });
+      res.status(200).setHeader('Content-Type', 'application/json');
+      res.end(await r.text());
+      return;
+    }
     const viaApp = Object.prototype.hasOwnProperty.call(app.ROUNDS, key);
     if (q.type === 'standings') {
       if (viaApp) { try { await handleStandingsApp(lg, key, q, res); return; } catch (e) { appError = e; } }
