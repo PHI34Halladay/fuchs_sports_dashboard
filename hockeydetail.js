@@ -237,19 +237,19 @@
 
   // Heim spielt oben (Blick nach unten, links/rechts spiegelt sich), Gast unten (Blick nach oben)
   const SPOT = {
-    home: { goalie: [50, 26], LV: [68, 52], RV: [32, 52], LS: [70, 80], MS: [50, 84], RS: [30, 80] },
-    away: { goalie: [50, 164], LV: [32, 138], RV: [68, 138], LS: [30, 110], MS: [50, 106], RS: [70, 110] },
+    home: { goalie: [50, 26], LV: [68, 52], RV: [32, 52], LS: [78, 73], MS: [50, 80], RS: [22, 73] },
+    away: { goalie: [50, 164], LV: [32, 138], RV: [68, 138], LS: [22, 117], MS: [50, 110], RS: [78, 117] },
   };
 
   function token(p, [x, y], fill, stroke, goalie, delay) {
     const ink = textOn(fill);
-    const w = Math.max(14, clip(p.last, 11).length * 3.1 + 4);
+    const w = Math.max(14, clip(p.last, 10).length * 2.6 + 4);
     return `<g class="hd-tok" style="animation-delay:${delay}ms" transform="translate(${x} ${y})">
-      <circle r="6.6" cy="0" fill="${fill}" stroke="${stroke}" stroke-width="1.2"/>
-      ${goalie ? '<path d="M-6.6 -1.2 H6.6" stroke="' + stroke + '" stroke-width=".7" opacity=".7"/>' : ''}
-      <text y="1.9" text-anchor="middle" font-size="5.6" font-weight="800" fill="${ink}">${esc(p.nr)}</text>
-      <rect x="${-w / 2}" y="8" width="${w}" height="5.2" rx="2.6" fill="rgba(10,14,20,.82)"/>
-      <text y="11.8" text-anchor="middle" font-size="3.4" font-weight="700" fill="#fff">${esc(clip(p.last, 11))}</text>
+      <circle r="5.6" cy="0" fill="${fill}" stroke="${stroke}" stroke-width="1.2"/>
+      ${goalie ? '<path d="M-5.6 -1.2 H5.6" stroke="' + stroke + '" stroke-width=".7" opacity=".7"/>' : ''}
+      <text y="1.9" text-anchor="middle" font-size="4.6" font-weight="800" fill="${ink}">${esc(p.nr)}</text>
+      <rect x="${-w / 2}" y="7" width="${w}" height="5.2" rx="2.6" fill="rgba(10,14,20,.82)"/>
+      <text y="10.7" text-anchor="middle" font-size="3" font-weight="700" fill="#fff">${esc(clip(p.last, 10))}</text>
     </g>`;
   }
 
