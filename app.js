@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '2.6.1';
+  const VERSION = '2.7.0';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -56,6 +56,8 @@
 
     { id: 'mlb', abbr: 'MLB', name: 'MLB', cat: 'baseball', group: 'Profis', sport: 'baseball', league: 'mlb', color: '#4a83e8' },
   ];
+  // Virtuelle Ligen „Live“ je Sportart: alle laufenden Spiele dieser Sportart (erscheint vorne in der Ligaleiste)
+  SPORTS.filter((sp) => sp.id !== 'fav').forEach((sp) => LEAGUES.push({ id: `live-${sp.id}`, name: 'Live', cat: sp.id, isLive: true, color: '#ff4757' }));
   const DEFAULT_LEAGUE = { fav: FAV_ID, soccer: 'bl1', football: 'nfl', basketball: 'nba', hockey: 'nhl', baseball: 'mlb' };
   const AMATEUR_LABEL = { sgm1: 'SGM I', sgm2: 'SGM II' };
 
@@ -69,7 +71,7 @@
   // Ligen mit eigener Datenquelle (Fussball.de bzw. Hockeyweb) laufen nicht über die ESPN-API
   // und haben keinen News-Tab.
   // Kein News-Tab: Amateurfußball und Hockeyweb-Ligen ohne eigene Meldungsgruppe (NL, SHL)
-  function noNewsTab(l) { return !!(l && (l.amateur || l.noNews)); }
+  function noNewsTab(l) { return !!(l && (l.amateur || l.noNews || l.isLive)); }
   function isOwnSource(l) { return !!(l && (l.amateur || l.hockey)); }
   const isEspn = (l) => !!(l && l.sport && l.league);
 
@@ -444,6 +446,8 @@
         <span class="sport-icon" aria-hidden="true">${s.icon}</span><span class="sport-label">${esc(s.label)}</span>${badge}${liveBadge}
       </button>`;
     }).join('');
+    const act = el.sports.querySelector('.sport-btn.active');
+    if (act) el.sports.scrollLeft = Math.max(0, act.offsetLeft - 12);
   }
 
   function renderLeaguebar() {
@@ -453,8 +457,12 @@
       el.leaguebar.innerHTML = `<div class="lg-info"><span>★ ${teams} Team${teams === 1 ? '' : 's'}</span><span>🔖 ${pinned} gemerkte${pinned === 1 ? 's' : ''} Spiel${pinned === 1 ? '' : 'e'}</span><span class="muted">Tipp: ★ markiert Teams, 🔖 merkt einzelne Spiele</span></div>`;
       return;
     }
-    const members = LEAGUES.filter((l) => l.cat === lg.cat);
-    el.leaguebar.innerHTML = members.map((l) => {
+    const members = LEAGUES.filter((l) => l.cat === lg.cat && !l.isLive);
+    const liveN = liveIn((l) => l.cat === lg.cat && !l.isLive);
+    const liveChip = liveN || lg.isLive
+      ? `<button type="button" class="lg-chip live-chip${lg.isLive ? ' active' : ''}" data-league="live-${lg.cat}" style="--lg:#ff4757"><span class="lg-logo live-dot" aria-hidden="true"></span><span>Live</span>${liveN ? `<span class="lg-live">${liveN}</span>` : ''}</button><span class="lg-sep" aria-hidden="true"></span>`
+      : '';
+    el.leaguebar.innerHTML = liveChip + members.map((l) => {
       const live = +liveCounts[l.id] || 0;
       return `<button type="button" class="lg-chip${l.id === lg.id ? ' active' : ''}${live ? ' has-live' : ''}" data-league="${l.id}" style="--lg:${l.color}">
         ${leagueBadge(l)}<span>${esc(l.name)}</span>${live ? `<span class="lg-live" title="${live} live">${live}</span>` : ''}
@@ -470,8 +478,10 @@
     const meta = leagueMeta.get(lg.id);
     const hl = lg.isFav ? '' : leagueLogoUrl(lg) || meta?.logo;
     el.heroLogo.innerHTML = hl ? `<img src="${esc(hl)}" alt="">` : lg.abbr ? `<b class="hero-abbr">${esc(lg.abbr)}</b>` : `<span>${sport?.icon || '★'}</span>`;
-    el.heroName.textContent = lg.isFav ? 'Meine Favoriten' : lg.name;
+    if (lg.isLive) el.heroLogo.innerHTML = '<span class="hero-live" aria-hidden="true"></span>';
+    el.heroName.textContent = lg.isFav ? 'Meine Favoriten' : lg.isLive ? `Live · ${sport?.label || ''}` : lg.name;
     const kick = lg.isFav ? 'Teams & gemerkte Spiele aus allen Ligen'
+      : lg.isLive ? 'Alle laufenden Spiele · nach Liga und Beginn'
       : lg.amateur ? 'Fußball · SGM Gündelbach/Häfnerhaslach'
         : [sport?.label, meta?.season].filter(Boolean).join(' · ');
     el.heroKicker.textContent = kick;
@@ -479,7 +489,7 @@
 
   function renderTabs() {
     const lg = currentLeague();
-    const isFavView = !!lg.isFav;
+    const isFavView = !!(lg.isFav || lg.isLive);
     const isCollege = COLLEGE_IDS.has(state.leagueId);
     el.tabs.querySelectorAll('.tab').forEach((b) => {
       const hide = (isFavView && b.dataset.tab !== 'scores') || (noNewsTab(lg) && b.dataset.tab === 'news');
@@ -489,7 +499,7 @@
       b.setAttribute('aria-selected', active);
     });
     el.tabs.style.display = isFavView ? 'none' : '';
-    el.scoreControls.style.display = state.tab === 'scores' ? '' : 'none';
+    el.scoreControls.style.display = state.tab === 'scores' && !lg.isLive ? '' : 'none';
     el.source.textContent = lg.amateur
       ? 'Daten: Fussball.de (ausgelesen, ohne Torstände) · Zeiten laut Spielplan'
       : lg.hockey
@@ -1345,12 +1355,56 @@
     setTimeout(() => row.classList.remove('hl'), 2600);
   }
 
+  // ---------- Live-Ansicht je Sportart ----------
+  // Alle laufenden Spiele der Sportart (ESPN-Ligen + Hockeyweb), gruppiert nach Liga (Reihenfolge
+  // wie in der Ligaleiste), innerhalb der Liga nach Anstoß/Beginn sortiert. Aktualisiert alle 30 s.
+  async function loadLive({ silent = false } = {}) {
+    const id = ++requestId;
+    clearTimeout(refreshTimer);
+    if (!silent) { skeleton(4); showStatus(''); }
+    const cat = currentLeague().cat;
+    const known = Object.keys(liveCounts).length > 0;
+    const espn = LEAGUES.filter((l) => l.cat === cat && isEspn(l) && (!known || +liveCounts[l.id] > 0));
+    const hock = LEAGUES.filter((l) => l.cat === cat && l.hockey);
+    const groups = [];
+    await Promise.all([
+      ...espn.map(async (lg) => {
+        try {
+          const params = { dates: ymdInTZ(defaultAnchor(lg), leagueTZ(lg)) };
+          if (lg.groups) params.groups = lg.groups;
+          const data = await api('scoreboard', params, lg);
+          const evs = (data.events || []).filter((e) => e.status?.type?.state === 'in').sort((a, b) => new Date(a.date) - new Date(b.date));
+          liveCounts[lg.id] = evs.length;
+          if (evs.length) groups.push({ lg, cards: evs.map((ev) => matchCard(espnModel(ev, lg))) });
+        } catch { /* Liga nicht erreichbar */ }
+      }),
+      ...hock.map(async (lg) => {
+        try {
+          const data = await hockeyGames(lg, toISODate(todayAnchor()));
+          const games = (data.games || []).filter((g) => g.live).sort(byTime);
+          if (games.length) groups.push({ lg, cards: games.map((g) => matchCard(hockeyModel(g, lg))) });
+        } catch { /* Hockeyweb nicht erreichbar */ }
+      }),
+    ]);
+    if (id !== requestId) return;
+    groups.sort((a, b) => LEAGUES.indexOf(a.lg) - LEAGUES.indexOf(b.lg));
+    el.content.innerHTML = groups.length
+      ? groups.map((g) => `<h2 class="group-title"><span class="live-group">${leagueBadge(g.lg)}${esc(g.lg.name)}</span><span class="group-count"><b class="live-text">${g.cards.length} live</b></span></h2><div class="games">${g.cards.join('')}</div>`).join('')
+      : '<div class="empty"><div class="empty-icon">📺</div>Gerade läuft in dieser Sportart kein Spiel.</div>';
+    paintCards();
+    setUpdated();
+    renderSports();
+    renderLeaguebar();
+    refreshTimer = setTimeout(() => { if (!document.hidden && currentLeague().isLive) loadLive({ silent: true }); }, REFRESH_LIVE_MS);
+  }
+
   // ---------- Steuerung ----------
   function load() {
     renderTabs();
     renderDate();
     const lg = currentLeague();
     if (lg.isFav) { loadFavoriteScores(); return; }
+    if (lg.isLive) { loadLive(); return; }
     if (lg.hockey) { loadHockey(); return; }
     if (lg.amateur) { loadAmateur(); return; }
     if (state.tab === 'scores') loadScores();
@@ -1361,6 +1415,7 @@
   function reloadSilently() {
     const lg = currentLeague();
     if (lg.isFav) loadFavoriteScores({ silent: true });
+    else if (lg.isLive) loadLive({ silent: true });
     else if (lg.hockey) loadHockey({ silent: true });
     else if (lg.amateur) loadAmateur({ silent: true });
     else if (state.tab === 'scores') loadScores({ silent: true });
@@ -1418,10 +1473,10 @@
     const changed = id !== state.leagueId;
     state.leagueId = id;
     if (tab) state.tab = tab;
-    if (lg.isFav) state.tab = 'scores';
+    if (lg.isFav || lg.isLive) state.tab = 'scores';
     if (noNewsTab(lg) && state.tab === 'news') state.tab = 'scores';
     if (changed) { state.standingsConf = null; lastStandings = null; }
-    if (lg.cat !== 'fav') { lastLeague[lg.cat] = id; writeJSON(LS_LAST, lastLeague); }
+    if (lg.cat !== 'fav' && !lg.isLive) { lastLeague[lg.cat] = id; writeJSON(LS_LAST, lastLeague); }
     persist();
     renderChrome();
     if (date) { state.date = date; load(); return; }
@@ -1652,9 +1707,9 @@
     const items = [];
     if (!q) {
       // Schnellzugriff: alle Ligen
-      LEAGUES.filter((l) => !l.isFav).forEach((l) => items.push({ type: 'league', lg: l.id, name: l.name, sub: SPORTS.find((s) => s.id === l.cat)?.label }));
+      LEAGUES.filter((l) => !l.isFav && !l.isLive).forEach((l) => items.push({ type: 'league', lg: l.id, name: l.name, sub: SPORTS.find((s) => s.id === l.cat)?.label }));
     } else {
-      LEAGUES.filter((l) => !l.isFav && scoreMatch(fold(l.name), q)).forEach((l) => items.push({ type: 'league', lg: l.id, name: l.name, sub: SPORTS.find((s) => s.id === l.cat)?.label }));
+      LEAGUES.filter((l) => !l.isFav && !l.isLive && scoreMatch(fold(l.name), q)).forEach((l) => items.push({ type: 'league', lg: l.id, name: l.name, sub: SPORTS.find((s) => s.id === l.cat)?.label }));
       const teams = teamIndex.map((t) => ({ t, s: scoreMatch(t.key, q) + (isFav(t.id, t.lg) ? 0.5 : 0) })).filter((x) => x.s >= 1)
         .sort((a, b) => b.s - a.s || a.t.name.localeCompare(b.t.name)).slice(0, 10);
       teams.forEach(({ t }) => items.push({ type: 'team', ...t, sub: t.sub || leagueById(t.lg)?.name }));
