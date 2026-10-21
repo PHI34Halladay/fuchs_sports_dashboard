@@ -161,8 +161,6 @@
 
     $body.innerHTML = (bioHtml + statsHtml + injHtml) || '<div class="gc-empty">Für diesen Spieler liegen keine weiteren Daten vor.</div>';
 
-    const web = (a.links || []).find((l) => (l.rel || []).includes('playercard')) || (a.links || [])[0];
-    if (web?.href) $body.insertAdjacentHTML('beforeend', `<div class="gc-foot"><a href="${ctx.esc(web.href)}" target="_blank" rel="noopener">Auf ESPN öffnen ↗</a></div>`);
   }
 
   // ---------- Team-Ansicht ----------
@@ -203,8 +201,6 @@
 
     $body.innerHTML = (recHtml + nextHtml + rosterHtml(roster)) || '<div class="gc-empty">Für dieses Team liegen keine weiteren Daten vor.</div>';
 
-    const web = (t.links || []).find((l) => (l.rel || []).includes('clubhouse')) || (t.links || [])[0];
-    if (web?.href) $body.insertAdjacentHTML('beforeend', `<div class="gc-foot"><a href="${ctx.esc(web.href)}" target="_blank" rel="noopener">Auf ESPN öffnen ↗</a></div>`);
   }
 
   // Kader: ESPN liefert entweder eine flache Spielerliste (NBA, Fußball) oder nach

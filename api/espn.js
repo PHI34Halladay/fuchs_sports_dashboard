@@ -19,6 +19,7 @@ const CACHE = {
   athlete: 300,
   roster: 3600,
   search: 600,
+  article: 3600,
 };
 
 const RE_SPORT = /^[a-z-]{2,30}$/;
@@ -87,6 +88,10 @@ function buildUrl(q) {
       if (!RE_ID.test(q.id || '')) throw new Error('Ungültige Team-ID');
       url = `${BASE_SITE}/${sport}/${league}/teams/${q.id}/roster`;
       break;
+    case 'article':
+      // Volltext eines News-Artikels (für den Lesemodus in der App)
+      if (!RE_ID.test(q.id || '')) throw new Error('Ungültige Artikel-ID');
+      return `https://content.core.api.espn.com/v1/sports/news/${q.id}`;
     case 'athlete':
       if (!RE_ID.test(q.id || '')) throw new Error('Ungültige Athlet-ID');
       url = `${BASE_WEB_COMMON}/${sport}/${league}/athletes/${q.id}`;

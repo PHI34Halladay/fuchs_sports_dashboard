@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '2.5.2';
+  const VERSION = '2.6.0';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -554,10 +554,12 @@
           ${team(m.away, 'away')}
         </div>
         ${m.extra ? `<div class="mc-extra">${m.extra}</div>` : ''}
-        ${m.meta || m.link ? `<div class="mc-meta"><span>${esc(m.meta || '')}</span>${m.link ? `<a href="${esc(m.link)}" target="_blank" rel="noopener">${esc(m.linkLabel || 'ESPN')} ↗</a>` : ''}</div>` : ''}
+        ${m.meta || (m.link && !isEspnUrl(m.link)) ? `<div class="mc-meta"><span>${esc(m.meta || '')}</span>${m.link && !isEspnUrl(m.link) ? `<a href="${esc(m.link)}" target="_blank" rel="noopener">${esc(m.linkLabel || 'ESPN')} ↗</a>` : ''}</div>` : ''}
       </article>`;
   }
 
+  // ESPN-Links führen auf dem Handy in die ESPN-App → nicht anzeigen, die App hat eigene Ansichten
+  const isEspnUrl = (u) => /(^|\.)espn\.(com|go\.com)\b|espn\.com\//i.test(String(u || ''));
   function paintCards() { window.TeamColor.paint(el.content); }
 
   // ---------- ESPN-Spiele ----------
@@ -965,22 +967,40 @@
     }
   }
 
+  // News: Artikel öffnen im Lesemodus der App (nicht espn.com / ESPN-App); Überschriften auf Knopfdruck deutsch
+  let newsList = [];
+  const newsTr = { state: 'en', de: null, err: '' };
   function renderNews(data) {
-    const articles = (data.articles || []).filter((a) => a.headline);
-    if (!articles.length) {
+    if (data) { newsList = (data.articles || []).filter((a) => a.headline && a.id); newsTr.state = 'en'; newsTr.de = null; }
+    if (!newsList.length) {
       el.content.innerHTML = '<div class="empty">Keine News verfügbar.</div>';
       return;
     }
-    el.content.innerHTML = `<div class="news">${articles.map((a, i) => {
+    const de = newsTr.state === 'de' && newsTr.de;
+    el.content.innerHTML = `<div class="tr-bar news-tr">${window.Translate.button(newsTr.state, newsTr.err).replace('data-tr="toggle"', 'data-tr="news"').replace('Auf Deutsch übersetzen', 'Überschriften auf Deutsch')}</div>
+      <div class="news">${newsList.map((a, i) => {
       const img = a.images?.find((x) => x.url)?.url;
-      const href = a.links?.web?.href || '#';
-      const desc = a.description && a.description !== a.headline ? `<p>${esc(a.description)}</p>` : '';
+      const head = de ? de[i * 2] : a.headline;
+      const d = de ? de[i * 2 + 1] : a.description;
+      const desc = d && d !== head ? `<p>${esc(d)}</p>` : '';
       const time = a.published ? `<time datetime="${esc(a.published)}">${fmtNews.format(new Date(a.published))} Uhr${a.type === 'Media' ? ' · ▶ Video' : ''}</time>` : '';
-      return `<a class="article${i === 0 ? ' lead' : ''}" href="${esc(href)}" target="_blank" rel="noopener">
+      return `<button type="button" class="article${i === 0 ? ' lead' : ''}" data-article="${i}">
         ${img ? `<img src="${esc(img)}" alt="" loading="lazy">` : ''}
-        <div class="article-body">${time}<h3>${esc(a.headline)}</h3>${desc}</div>
-      </a>`;
+        <div class="article-body">${time}<h3>${esc(head)}</h3>${desc}</div>
+      </button>`;
     }).join('')}</div>`;
+  }
+  async function toggleNewsTranslation() {
+    if (newsTr.state === 'loading') return;
+    if (newsTr.state === 'de') { newsTr.state = 'en'; renderNews(); return; }
+    if (newsTr.de) { newsTr.state = 'de'; renderNews(); return; }
+    const list = newsList;
+    newsTr.state = 'loading'; renderNews();
+    try {
+      newsTr.de = await window.Translate.translate(list.flatMap((a) => [a.headline, a.description || '']), `newslist:${state.leagueId}:${list.map((a) => a.id).join(',')}`);
+      newsTr.state = 'de';
+    } catch (e) { newsTr.state = 'error'; newsTr.err = e.message; }
+    if (list === newsList && state.tab === 'news') renderNews();
   }
 
   // ---------- Kreisliga (Fussball.de über /api/amateur) ----------
@@ -1513,6 +1533,9 @@
     const kreis = e.target.closest('[data-kreis]');
     if (kreis) { state.kreisTeam = kreis.dataset.kreis; persist(); loadAmateur(); return; }
     if (e.target.closest('[data-open-search]')) { openSearch(); return; }
+    if (e.target.closest('[data-tr="news"]')) { toggleNewsTranslation(); return; }
+    const art = e.target.closest('[data-article]');
+    if (art) { const lg = currentLeague(); window.Reader.open(newsList[+art.dataset.article], { sport: lg.sport, league: lg.league, name: lg.name }); return; }
     const teamEl = e.target.closest('[data-team-id]');
     if (teamEl) { window.Profile.openTeam(teamEl.dataset.teamId, cardLeague(teamEl)); return; }
     const playerEl = e.target.closest('[data-player-id]');
@@ -1871,6 +1894,7 @@
   // Liga-Kontext (sport/league) → eigene Liga-ID, damit das Team-Profil den Favoriten-Stern kennt
   const leagueIdFor = (ctx) => LEAGUES.find((l) => l.sport === ctx?.sport && l.league === ctx?.league)?.id || null;
   window.Gamecast.init({ api, esc, league: currentLeague, isFav });
+  window.Reader.init({ api, esc });
   window.Profile.init({
     api, esc,
     fav: {

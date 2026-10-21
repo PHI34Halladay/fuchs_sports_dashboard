@@ -324,9 +324,7 @@
       case 'preview': $body.innerHTML = preview(d); break;
       default: $body.innerHTML = genericOverview(d);
     }
-    if (current.link) {
-      $body.insertAdjacentHTML('beforeend', `<div class="gc-foot"><a href="${ctx.esc(current.link)}" target="_blank" rel="noopener">Auf ESPN öffnen ↗</a></div>`);
-    }
+    // Kein Link zu espn.com – würde auf dem Handy in die ESPN-App springen
   }
 
   // ---------- NHL: Gamecast ----------
@@ -1576,7 +1574,7 @@
           ${dur ? `<span class="gc-video-dur">${dur}</span>` : ''}
         </div>
         <div class="gc-video-title">${ctx.esc(v.headline)}</div>
-        ${!mp4 && web ? `<a class="gc-video-link" href="${ctx.esc(web)}" target="_blank" rel="noopener">Auf ESPN ansehen ↗</a>` : ''}
+        ${!mp4 && web ? '<span class="gc-video-link muted">Nur in der ESPN-App verfügbar</span>' : ''}
       </div>`;
     }).join('')}</div>`);
   }
@@ -1585,15 +1583,37 @@
   function recap(d) {
     const a = d.article || {};
     const img = a.images?.find((i) => i.url)?.url;
-    const paragraphs = storyParagraphs(a.story || '');
+    const paras = storyParagraphs(a.story || '');
+    const tr = current.tr || { state: 'en' };
+    const de = tr.state === 'de' && tr.de;
+    const headline = de ? de[0] : a.headline || '';
+    const shown = de ? de.slice(1) : paras;
     const byline = [a.byline, a.source, a.published && new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(a.published))].filter(Boolean).join(' · ');
     return `<article class="gc-article">
       ${img ? `<img src="${ctx.esc(img)}" alt="" loading="lazy">` : ''}
-      <h2>${ctx.esc(a.headline || '')}</h2>
+      <h2>${ctx.esc(headline)}</h2>
       ${byline ? `<div class="muted">${ctx.esc(byline)}</div>` : ''}
-      ${paragraphs.map((p) => `<p>${ctx.esc(p)}</p>`).join('')}
-      <div class="gc-note">Originaltext von ESPN / AP (englisch).</div>
+      ${paras.length || a.headline ? `<div class="tr-bar">${window.Translate.button(tr.state, tr.err)}</div>` : ''}
+      ${shown.map((p) => `<p>${ctx.esc(p)}</p>`).join('')}
+      <div class="gc-note">${de ? 'Maschinell übersetzt aus dem Englischen · ' : ''}Originaltext von ESPN / AP.</div>
     </article>`;
+  }
+
+  async function translateRecap() {
+    const d = current?.data;
+    if (!d) return;
+    const tr = current.tr = current.tr || { state: 'en' };
+    if (tr.state === 'loading') return;
+    if (tr.state === 'de') { tr.state = 'en'; render(true); return; }
+    if (tr.de) { tr.state = 'de'; render(true); return; }
+    const a = d.article || {};
+    const mine = current;
+    tr.state = 'loading'; render(true);
+    try {
+      tr.de = await window.Translate.translate([a.headline || '', ...storyParagraphs(a.story || '')], `recap:${mine.eventId}`);
+      tr.state = 'de';
+    } catch (e) { tr.state = 'error'; tr.err = e.message; }
+    if (current === mine && current.tab === 'recap') render(true);
   }
 
   // Story ist HTML von ESPN → nur reinen Text übernehmen (kein fremdes HTML einschleusen)
@@ -1703,6 +1723,7 @@
     if (per) { current.period = per.dataset.period; render(true); return; }
     const f = e.target.closest('[data-filter]');
     if (f) { current.filter = f.dataset.filter; render(true); return; }
+    if (e.target.closest('[data-tr="toggle"]')) { translateRecap(); return; }
     const bt = e.target.closest('[data-boxteam]');
     if (bt) { current.boxTeam = bt.dataset.boxteam; render(true); return; }
     const sf = e.target.closest('[data-shotteam]');
