@@ -41,10 +41,18 @@ async function getApp(request, params, ttlSec) {
   const ck = `app:${request}:${JSON.stringify(params)}`;
   const hit = memo.get(ck);
   if (hit && Date.now() - hit.t < ttlSec * 1000) return hit.json;
-  const res = await fetch(app.apiUrl(request, params, key), {
-    headers: { 'User-Agent': UA, Accept: 'application/json' },
-    signal: AbortSignal.timeout(8000),
-  });
+  let res;
+  for (let i = 0; i < 2; i++) {
+    try {
+      res = await fetch(app.apiUrl(request, params, key), { // jeder Versuch neu signiert (Zeitstempel)
+        headers: { 'User-Agent': UA, Accept: 'application/json' },
+        signal: AbortSignal.timeout(8000),
+      });
+    } catch (e) { res = null; if (i === 1) { if (hit) return hit.json; throw e; } continue; }
+    if (res.status < 500) break;
+    if (i === 1) { if (hit) return hit.json; throw new Error(`App-API antwortet mit ${res.status}`); }
+    await new Promise((r) => setTimeout(r, 400));
+  }
   if (!res.ok) throw new Error(`App-API antwortet mit ${res.status}`);
   const json = await res.json();
   if (json?.status && json.status !== 'ok') throw new Error('App-API: ' + json.status);

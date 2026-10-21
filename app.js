@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '2.6.0';
+  const VERSION = '2.6.1';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -1485,11 +1485,11 @@
     loadScores();
   });
 
-  // Auto-Reload: lädt die gesamte Seite alle 30 s neu (z. B. für einen dauerhaft angezeigten Bildschirm)
+  // Auto-Reload: aktualisiert alle 30 s nur die Ergebnisse (ohne die Seite neu zu laden) (z. B. für einen dauerhaft angezeigten Bildschirm)
   let autoReloadTimer = null;
   function setAutoReload(on) {
     clearInterval(autoReloadTimer);
-    autoReloadTimer = on ? setInterval(() => location.reload(), 30_000) : null;
+    autoReloadTimer = on ? setInterval(() => { if (!document.hidden && !document.querySelector('dialog[open]')) reloadSilently(); }, 30_000) : null;
   }
   el.autoReload.checked = state.autoReload;
   setAutoReload(state.autoReload);

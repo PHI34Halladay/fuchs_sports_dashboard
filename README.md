@@ -24,7 +24,7 @@ Gehostet auf Vercel, Code auf GitHub – ohne Build-Schritt, ohne Abhängigkeite
   - *Boxscore (alle Sportarten):* oben Umschalter zwischen den beiden Teams statt beide untereinander.
   - *Vor Spielbeginn (alle Ligen):* Vorschau mit Saisonduell, Form, Torhütern/Pitchern, Topspielern, Ausfällen, Prognose & Quoten, Tabelle.
 - **Spieler- & Team-Popups:** Teamprofil in Vereinsfarben mit ★-Favoritenknopf, Bilanz, nächstem Spiel und **Kader** (Spieler antippen → Spielerprofil).
-- **Dunkle Logo-Variante** per langem Druck auf ein Logo (pro Team gespeichert), **Auto-Reload**-Schalter im Footer, Versionsnummer unten.
+- **Dunkle Logo-Variante** per langem Druck auf ein Logo (pro Team gespeichert), **Auto-Reload**-Schalter im Footer (aktualisiert alle 30 s nur die Ergebnisse), Versionsnummer unten.
 
 ## Aufbau
 
