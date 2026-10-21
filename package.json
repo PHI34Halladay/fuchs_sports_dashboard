@@ -1,11 +1,14 @@
 {
   "name": "espn-dashboard",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "private": true,
   "description": "Browser-Dashboard für Spielstände, Tabellen und News aus ESPN, Fussball.de und Hockeyweb",
   "scripts": {
     "dev": "vercel dev",
     "test": "node --test"
+  },
+  "dependencies": {
+    "@vercel/blob": "^1.1.1"
   },
   "engines": {
     "node": ">=18"

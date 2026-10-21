@@ -25,6 +25,10 @@
         <span class="search-trigger-text">Team oder Spieler suchen</span>
         <kbd>/</kbd>
       </button>
+      <button type="button" class="sync-trigger" id="syncBtn" aria-label="Geräte synchronisieren" title="Teams & gemerkte Spiele auf allen Geräten">
+        <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M7 18.5h10.5a4 4 0 0 0 .6-7.96A6 6 0 0 0 6.6 9.2 4.7 4.7 0 0 0 7 18.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        <i class="sync-dot" id="syncDot"></i>
+      </button>
     </div>
     <nav class="leaguebar" id="leaguebar" aria-label="Ligen"></nav>
   </header>
@@ -85,6 +89,11 @@
       </div>
       <div class="search-results" id="searchResults"></div>
     </div>
+  </dialog>
+
+  <dialog class="syncdlg" id="syncDlg" aria-label="Synchronisieren">
+    <button type="button" class="pf-close" id="syncClose" aria-label="Schließen">×</button>
+    <div class="sync-body" id="syncBody"></div>
   </dialog>
 
   <script src="logo.js"></script>

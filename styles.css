@@ -883,3 +883,43 @@ dialog.pf::backdrop { background: rgba(0, 0, 0, .7); backdrop-filter: blur(4px);
 .hd-tok { animation: hd-pop .35s cubic-bezier(.2, 1.4, .4, 1) both; transform-box: fill-box; }
 @keyframes hd-pop { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .hd-tok { animation: none; } }
+/* ---------- Geräte-Sync ---------- */
+.sync-trigger {
+  position: relative; flex-shrink: 0; width: 38px; height: 36px; border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--border); color: var(--muted);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.sync-trigger:hover { color: var(--text); border-color: var(--border-strong); }
+.sync-dot { position: absolute; right: 5px; bottom: 5px; width: 8px; height: 8px; border-radius: 50%; background: transparent; }
+.sync-dot.on { background: var(--win); box-shadow: 0 0 6px var(--win); }
+.sync-dot.busy { background: var(--fav); animation: pulse 1s infinite; }
+.sync-dot.err { background: var(--live); }
+dialog.syncdlg {
+  padding: 0; border: 1px solid var(--border-strong); border-radius: 20px; background: var(--bg); color: var(--text);
+  width: min(480px, calc(100vw - 24px)); box-shadow: 0 30px 90px rgba(0, 0, 0, .6);
+}
+dialog.syncdlg::backdrop { background: rgba(0, 0, 0, .7); backdrop-filter: blur(4px); }
+.sync-body { padding: 22px 20px 20px; }
+.sync-body h2 { margin: 0 0 6px; font-family: var(--display); font-size: 26px; font-weight: 800; text-transform: uppercase; letter-spacing: .3px; }
+.sync-body p { margin: 6px 0 12px; font-size: 14px; line-height: 1.5; }
+.sync-body p.small { font-size: 12px; margin-bottom: 0; }
+.sync-ok { color: var(--win); font-size: 16px; vertical-align: 4px; }
+.sync-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin: 12px 0; }
+.sync-step { font-size: 10px; font-weight: 700; letter-spacing: .9px; text-transform: uppercase; color: var(--muted); }
+.sync-primary { padding: 9px 16px; border-radius: 10px; border: 0; background: var(--accent); color: #fff; font-weight: 700; }
+.sync-primary:disabled { opacity: .6; }
+.sync-join { display: flex; gap: 8px; }
+.sync-join input { flex: 1; min-width: 0; height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text); font: 600 15px var(--font); letter-spacing: 1px; text-transform: uppercase; }
+.sync-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22px; font-weight: 700; letter-spacing: 2px; margin: 8px 0 10px; user-select: all; overflow-wrap: anywhere; }
+.sync-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.sync-actions button { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface-2); font-size: 13px; font-weight: 600; }
+.sync-actions button:hover { border-color: var(--accent); }
+.sync-actions button.danger { color: #ff8b8b; }
+@media (max-width: 640px) { .sync-trigger { width: 38px; height: 38px; } }
+/* Kopfzeile: bei mittlerer Breite Suche nur als Symbol, damit nichts überläuft */
+.topbar-row { min-width: 0; }
+.sports { min-width: 0; }
+@media (max-width: 1440px) {
+  .search-trigger { min-width: 0; width: 38px; height: 36px; padding: 0; justify-content: center; }
+  .search-trigger-text, .search-trigger kbd { display: none; }
+}

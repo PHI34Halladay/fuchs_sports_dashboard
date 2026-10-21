@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '2.4.0';
+  const VERSION = '2.5.0';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -168,17 +168,88 @@
     const key = favKey(teamId, leagueId);
     if (favorites.has(key)) favorites.delete(key); else favorites.add(key);
     writeJSON(LS_FAV, [...favorites]);
+    syncMark(`f:${key}`, favorites.has(key));
   }
   const isPinned = (key) => pins.some((p) => p.key === key);
   function togglePin(key) {
-    if (isPinned(key)) pins = pins.filter((p) => p.key !== key);
+    if (isPinned(key)) { pins = pins.filter((p) => p.key !== key); syncMark(`p:${key}`, false); }
     else {
       const snap = pinSnapshots.get(key);
       if (!snap) return;
       pins.push(snap);
+      syncMark(`p:${key}`, true, snap);
     }
     writeJSON(LS_PINS, pins);
   }
+
+  // ---------- Geräte-Sync (Favoriten-Teams + gemerkte Spiele) ----------
+  // Jede Änderung wird mit Zeitstempel im "Journal" vermerkt (auch Löschungen). Beim Abgleich
+  // mit /api/sync gewinnt je Eintrag der neueste Stand – so gehen Änderungen auf keinem Gerät verloren.
+  const LS_SYNC = 'sd:sync';
+  const LS_JOURNAL = 'sd:syncItems';
+  const syncCfg = readJSON(LS_SYNC, {});
+  let journal = readJSON(LS_JOURNAL, null) || {};
+  // Bestehende lokale Einträge ohne Journal mit Zeitstempel 0 aufnehmen (verlieren gegen jede echte Änderung)
+  favorites.forEach((k) => { if (!journal[`f:${k}`]) journal[`f:${k}`] = { t: 0, on: true }; });
+  pins.forEach((p) => { if (!journal[`p:${p.key}`]) journal[`p:${p.key}`] = { t: 0, on: true, data: p }; });
+  writeJSON(LS_JOURNAL, journal);
+  let syncTimer = null;
+  let syncBusy = false;
+  let syncError = '';
+
+  function syncMark(key, on, data) {
+    journal[key] = { t: Date.now(), on, ...(on && data ? { data } : {}) };
+    writeJSON(LS_JOURNAL, journal);
+    if (syncCfg.code) { clearTimeout(syncTimer); syncTimer = setTimeout(() => syncNow(), 1200); }
+  }
+
+  function applyJournal(items) {
+    const before = JSON.stringify([[...favorites].sort(), pins.map((p) => p.key).sort()]);
+    journal = items || {};
+    favorites = new Set(Object.keys(journal).filter((k) => k.startsWith('f:') && journal[k].on).map((k) => k.slice(2)));
+    const pinCutoff = ymdOf(new Date(Date.now() - 45 * 864e5));
+    pins = Object.entries(journal).filter(([k, v]) => k.startsWith('p:') && v.on && v.data?.key && String(v.data.day || '') >= pinCutoff).map(([, v]) => v.data);
+    writeJSON(LS_JOURNAL, journal);
+    writeJSON(LS_FAV, [...favorites]);
+    writeJSON(LS_PINS, pins);
+    return JSON.stringify([[...favorites].sort(), pins.map((p) => p.key).sort()]) !== before;
+  }
+
+  async function syncNow() {
+    if (!syncCfg.code || syncBusy) return false;
+    syncBusy = true;
+    renderSyncState();
+    try {
+      const res = await fetch('/api/sync', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: syncCfg.code, items: journal }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Fehler ${res.status}`);
+      const changed = applyJournal(data.items);
+      syncCfg.last = Date.now();
+      writeJSON(LS_SYNC, syncCfg);
+      syncError = '';
+      if (changed) { renderSports(); renderLeaguebar(); reloadSilently(); }
+      return true;
+    } catch (e) {
+      syncError = e.message;
+      return false;
+    } finally {
+      syncBusy = false;
+      renderSyncState();
+    }
+  }
+
+  const SYNC_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  function newSyncCode() {
+    const r = new Uint8Array(16);
+    crypto.getRandomValues(r);
+    return [...r].map((b) => SYNC_ALPHABET[b % 32]).join('');
+  }
+  const normCode = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const fmtCode = (c) => c.replace(/(.{4})(?=.)/g, '$1-');
+  const syncLink = () => `${location.origin}${location.pathname}?sync=${syncCfg.code}`;
 
   function ymdOf(d) {
     return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
@@ -1682,6 +1753,119 @@
       openSearch();
     }
   });
+
+  // ---------- Sync-Dialog ----------
+  const syncDlg = $('syncDlg');
+  const syncBody = $('syncBody');
+  const syncDot = $('syncDot');
+  const fmtSyncTime = (t) => (t ? new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(t)) : '–');
+
+  function renderSyncState() {
+    syncDot.className = `sync-dot${syncCfg.code ? (syncError ? ' err' : syncBusy ? ' busy' : ' on') : ''}`;
+    $('syncBtn').title = syncCfg.code ? (syncError ? `Sync-Fehler: ${syncError}` : `Synchronisiert · zuletzt ${fmtSyncTime(syncCfg.last)}`) : 'Teams & gemerkte Spiele auf allen Geräten';
+    if (syncDlg.open) renderSyncDialog();
+  }
+
+  function renderSyncDialog() {
+    const counts = `<b>${favorites.size}</b> Team${favorites.size === 1 ? '' : 's'} · <b>${pins.length}</b> gemerkte${pins.length === 1 ? 's' : ''} Spiel${pins.length === 1 ? '' : 'e'}`;
+    if (!syncCfg.code) {
+      syncBody.innerHTML = `
+        <h2>Auf allen Geräten</h2>
+        <p class="muted">Deine ★-Teams und 🔖 gemerkten Spiele werden online gespeichert und mit deinen anderen Geräten abgeglichen. Verknüpft wird über einen persönlichen Sync-Code – ohne Konto.</p>
+        <div class="sync-card">
+          <div class="sync-step">Erstes Gerät</div>
+          <p>Aktuell auf diesem Gerät: ${counts}</p>
+          <button type="button" class="sync-primary" data-sync="create">Sync starten</button>
+        </div>
+        <div class="sync-card">
+          <div class="sync-step">Weiteres Gerät</div>
+          <p>Code vom anderen Gerät eingeben (oder dort den Link öffnen):</p>
+          <div class="sync-join"><input id="syncCodeInput" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false" maxlength="22"><button type="button" class="sync-primary" data-sync="join">Verbinden</button></div>
+        </div>
+        ${syncError ? `<div class="status error">${esc(syncError)}</div>` : ''}`;
+      return;
+    }
+    syncBody.innerHTML = `
+      <h2>Sync aktiv <span class="sync-ok">●</span></h2>
+      <p>${counts} · zuletzt abgeglichen ${esc(fmtSyncTime(syncCfg.last))}${syncBusy ? ' · <i>läuft …</i>' : ''}</p>
+      ${syncError ? `<div class="status error">${esc(syncError)}</div>` : ''}
+      <div class="sync-card">
+        <div class="sync-step">Dein Sync-Code</div>
+        <div class="sync-code">${esc(fmtCode(syncCfg.code))}</div>
+        <div class="sync-actions">
+          <button type="button" data-sync="copylink">Link kopieren</button>
+          <button type="button" data-sync="copycode">Code kopieren</button>
+          ${navigator.share ? '<button type="button" data-sync="share">Teilen …</button>' : ''}
+        </div>
+        <p class="muted small">Auf dem anderen Gerät den Link öffnen oder den Code unter ☁︎ eingeben. Behandle den Code wie ein Passwort – wer ihn kennt, sieht und ändert deine Favoriten.</p>
+      </div>
+      <div class="sync-actions">
+        <button type="button" data-sync="now">Jetzt abgleichen</button>
+        <button type="button" class="danger" data-sync="leave">Dieses Gerät trennen</button>
+      </div>`;
+  }
+
+  function openSync() {
+    renderSyncDialog();
+    if (!syncDlg.open) syncDlg.showModal();
+  }
+
+  async function connectSync(code) {
+    syncCfg.code = code;
+    writeJSON(LS_SYNC, syncCfg);
+    const ok = await syncNow();
+    if (!ok) { delete syncCfg.code; writeJSON(LS_SYNC, syncCfg); }
+    renderSyncState();
+    return ok;
+  }
+
+  async function copyText(txt, btn) {
+    try { await navigator.clipboard.writeText(txt); btn.textContent = 'Kopiert ✓'; }
+    catch { window.prompt('Kopieren:', txt); }
+  }
+
+  $('syncBtn').addEventListener('click', openSync);
+  $('syncClose').addEventListener('click', () => syncDlg.close());
+  syncDlg.addEventListener('click', async (e) => {
+    if (e.target === syncDlg) { syncDlg.close(); return; }
+    const b = e.target.closest('[data-sync]');
+    if (!b) return;
+    const act = b.dataset.sync;
+    if (act === 'create') { b.disabled = true; await connectSync(newSyncCode()); }
+    else if (act === 'join') {
+      const code = normCode($('syncCodeInput').value);
+      if (!/^[A-Z2-9]{16}$/.test(code)) { syncError = 'Der Code hat 16 Zeichen (Buchstaben/Ziffern).'; renderSyncDialog(); return; }
+      b.disabled = true;
+      await connectSync(code);
+    } else if (act === 'copylink') copyText(syncLink(), b);
+    else if (act === 'copycode') copyText(fmtCode(syncCfg.code), b);
+    else if (act === 'share') navigator.share({ title: 'Sport Dashboard – Sync', text: 'Favoriten auf diesem Gerät übernehmen', url: syncLink() }).catch(() => {});
+    else if (act === 'now') syncNow();
+    else if (act === 'leave') {
+      delete syncCfg.code; delete syncCfg.last; syncError = '';
+      writeJSON(LS_SYNC, syncCfg);
+      renderSyncState();
+      renderSyncDialog();
+    }
+  });
+  syncDlg.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.id === 'syncCodeInput') { e.preventDefault(); syncDlg.querySelector('[data-sync="join"]')?.click(); }
+  });
+
+  // Link mit ?sync=CODE verknüpft dieses Gerät direkt
+  (() => {
+    const p = new URLSearchParams(location.search);
+    const code = normCode(p.get('sync'));
+    if (!p.has('sync')) return;
+    p.delete('sync');
+    history.replaceState(null, '', `${location.pathname}${p.toString() ? `?${p}` : ''}${location.hash}`);
+    if (/^[A-Z2-9]{16}$/.test(code) && code !== syncCfg.code) connectSync(code).then(() => openSync());
+  })();
+  // Regelmäßig abgleichen: beim Start, beim Zurückkehren zur Seite und alle 2 Minuten
+  if (syncCfg.code) syncNow();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && syncCfg.code) syncNow(); });
+  setInterval(() => { if (!document.hidden && syncCfg.code) syncNow(); }, 120_000);
+  renderSyncState();
 
   // ---------- Start ----------
   // Liga-Kontext (sport/league) → eigene Liga-ID, damit das Team-Profil den Favoriten-Stern kennt
