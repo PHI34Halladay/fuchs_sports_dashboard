@@ -390,9 +390,12 @@ dialog.search::backdrop { background: rgba(0, 0, 0, .6); backdrop-filter: blur(4
   .brand-name { font-size: 20px; }
   .brand { flex: 1; }
   /* Sportarten oben als scrollbare Reihe */
-  .sports { padding: 2px 12px 4px; gap: 4px; }
-  .sport-btn { flex-shrink: 0; padding: 6px 11px; font-size: 13px; gap: 6px; }
-  .sport-icon { font-size: 15px; }
+  /* Mobil: nur Symbole, gleichmäßig über die volle Breite verteilt */
+  .sports { padding: 2px 8px 4px; gap: 2px; overflow-x: hidden; }
+  .sport-btn { flex: 1 1 0; min-width: 0; justify-content: center; padding: 8px 0; }
+  .sport-icon { font-size: 21px; }
+  .sport-label { display: none; }
+  .sport-badge, .sport-live { position: absolute; top: 0; right: 50%; margin-right: -22px; }
   .search-trigger { width: 38px; height: 38px; justify-content: center; padding: 0; }
   .leaguebar { padding: 6px 12px 9px; gap: 6px; }
   .container { padding: 12px 12px calc(20px + var(--bottom-nav)); }

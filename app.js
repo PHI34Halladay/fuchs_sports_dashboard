@@ -442,7 +442,7 @@
       const badge = s.id === 'fav' && pins.length ? `<span class="sport-badge">${pins.length}</span>` : '';
       const live = s.id === 'fav' ? 0 : liveIn((l) => l.cat === s.id);
       const liveBadge = live ? `<span class="sport-live" title="${live} Spiel${live === 1 ? '' : 'e'} live">${live}</span>` : '';
-      return `<button type="button" class="sport-btn${s.id === cat ? ' active' : ''}${s.id === 'fav' ? ' sport-fav' : ''}${live ? ' has-live' : ''}" data-sport="${s.id}" aria-pressed="${s.id === cat}">
+      return `<button type="button" class="sport-btn${s.id === cat ? ' active' : ''}${s.id === 'fav' ? ' sport-fav' : ''}${live ? ' has-live' : ''}" data-sport="${s.id}" aria-label="${esc(s.label)}" title="${esc(s.label)}" aria-pressed="${s.id === cat}">
         <span class="sport-icon" aria-hidden="true">${s.icon}</span><span class="sport-label">${esc(s.label)}</span>${badge}${liveBadge}
       </button>`;
     }).join('');
