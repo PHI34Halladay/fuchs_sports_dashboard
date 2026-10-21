@@ -43,11 +43,15 @@
   dlg.addEventListener('click', (e) => {
     if (e.target === dlg || e.target.closest('.gc-close')) { close(); return; }
     const tab = e.target.closest('[data-hdtab]');
-    if (tab && cur) { cur.tab = tab.dataset.hdtab; render(false); }
+    if (tab && cur) { cur.tab = tab.dataset.hdtab; render(false); return; }
+    const vw = e.target.closest('[data-hdview]');
+    if (vw && cur) { cur.view = vw.dataset.hdview; render(true); return; }
+    const ln = e.target.closest('[data-hdline]');
+    if (ln && cur) { cur.line = Number(ln.dataset.hdline); render(true); }
   });
 
   function open(game, lg) {
-    cur = { game, lg, data: null, tab: 'verlauf' };
+    cur = { game, lg, data: null, tab: 'verlauf', view: 'ice', line: 1 };
     $scroll.scrollTop = 0;
     $tabs.innerHTML = '';
     renderHead();
@@ -222,6 +226,93 @@
     return html;
   }
 
+  // ---------- Eisfläche: so stehen die Reihen auf dem Eis ----------
+  const hexOk = (c) => /^#[0-9a-f]{6}$/i.test(c || '');
+  function textOn(bg) {
+    const n = parseInt(bg.slice(1), 16);
+    const l = (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
+    return l > 0.6 ? '#10141a' : '#ffffff';
+  }
+  const clip = (s, n) => (String(s).length > n ? `${String(s).slice(0, n - 1)}…` : String(s));
+
+  // Heim spielt oben (Blick nach unten, links/rechts spiegelt sich), Gast unten (Blick nach oben)
+  const SPOT = {
+    home: { goalie: [50, 26], LV: [68, 52], RV: [32, 52], LS: [70, 80], MS: [50, 84], RS: [30, 80] },
+    away: { goalie: [50, 164], LV: [32, 138], RV: [68, 138], LS: [30, 110], MS: [50, 106], RS: [70, 110] },
+  };
+
+  function token(p, [x, y], fill, stroke, goalie, delay) {
+    const ink = textOn(fill);
+    const w = Math.max(14, clip(p.last, 11).length * 3.1 + 4);
+    return `<g class="hd-tok" style="animation-delay:${delay}ms" transform="translate(${x} ${y})">
+      <circle r="6.6" cy="0" fill="${fill}" stroke="${stroke}" stroke-width="1.2"/>
+      ${goalie ? '<path d="M-6.6 -1.2 H6.6" stroke="' + stroke + '" stroke-width=".7" opacity=".7"/>' : ''}
+      <text y="1.9" text-anchor="middle" font-size="5.6" font-weight="800" fill="${ink}">${esc(p.nr)}</text>
+      <rect x="${-w / 2}" y="8" width="${w}" height="5.2" rx="2.6" fill="rgba(10,14,20,.82)"/>
+      <text y="11.8" text-anchor="middle" font-size="3.4" font-weight="700" fill="#fff">${esc(clip(p.last, 11))}</text>
+    </g>`;
+  }
+
+  function sideTokens(side, lu, line, fill, stroke) {
+    const spot = SPOT[side];
+    const out = [];
+    const l = lu?.lines.find((x) => x.line === line);
+    if (lu?.goalies[0]) out.push(token(lu.goalies[0], spot.goalie, fill, stroke, true, 0));
+    let i = 1;
+    for (const p of [...(l?.defense || []), ...(l?.forwards || [])]) {
+      if (spot[p.pos]) out.push(token(p, spot[p.pos], fill, stroke, false, i++ * 45));
+    }
+    return out.join('');
+  }
+
+  function rinkSvg(d) {
+    const g = cur.game;
+    const [hc, ac] = window.TeamColor
+      ? window.TeamColor.pair({ color: g.home.color, alt: g.home.alt }, { color: g.away.color, alt: g.away.alt }) : [null, null];
+    const hf = hexOk(hc) ? hc : '#3a7bd5';
+    const af = hexOk(ac) ? ac : '#d5503a';
+    const hs = hexOk(`#${g.home.alt || ''}`) && textOn(hf) === '#ffffff' ? `#${g.home.alt}` : '#ffffff';
+    const as = hexOk(`#${g.away.alt || ''}`) && textOn(af) === '#ffffff' ? `#${g.away.alt}` : '#ffffff';
+    const faceoff = (x, y) => `<circle cx="${x}" cy="${y}" r="10" fill="none" stroke="#d6453d" stroke-width=".55"/><circle cx="${x}" cy="${y}" r="1.1" fill="#d6453d"/>`;
+    return `
+    <svg class="hd-rink" viewBox="0 0 100 190" role="img" aria-label="Aufstellung auf dem Eis">
+      <defs>
+        <linearGradient id="hdIce" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2f8fc"/><stop offset=".5" stop-color="#e3eef6"/><stop offset="1" stop-color="#f2f8fc"/></linearGradient>
+      </defs>
+      <rect x="3" y="3" width="94" height="184" rx="26" fill="url(#hdIce)" stroke="#2b3a49" stroke-width="2"/>
+      <g stroke-linecap="round">
+        <line x1="3.6" y1="20" x2="96.4" y2="20" stroke="#d6453d" stroke-width=".5"/>
+        <line x1="3.6" y1="170" x2="96.4" y2="170" stroke="#d6453d" stroke-width=".5"/>
+        <rect x="3.6" y="64.2" width="92.8" height="1.8" fill="#2a6fbf" opacity=".85"/>
+        <rect x="3.6" y="124" width="92.8" height="1.8" fill="#2a6fbf" opacity=".85"/>
+        <rect x="3.6" y="94.1" width="92.8" height="1.8" fill="#d6453d" opacity=".9"/>
+      </g>
+      <circle cx="50" cy="95" r="14" fill="none" stroke="#2a6fbf" stroke-width=".6"/><circle cx="50" cy="95" r="1.4" fill="#2a6fbf"/>
+      ${faceoff(28, 40)}${faceoff(72, 40)}${faceoff(28, 150)}${faceoff(72, 150)}
+      <circle cx="30" cy="76" r="1" fill="#d6453d"/><circle cx="70" cy="76" r="1" fill="#d6453d"/><circle cx="30" cy="114" r="1" fill="#d6453d"/><circle cx="70" cy="114" r="1" fill="#d6453d"/>
+      <path d="M42 20 A8 8 0 0 0 58 20 Z" fill="#a9d3f0" stroke="#d6453d" stroke-width=".5"/>
+      <path d="M42 170 A8 8 0 0 1 58 170 Z" fill="#a9d3f0" stroke="#d6453d" stroke-width=".5"/>
+      <rect x="45" y="15.8" width="10" height="4.2" rx="1" fill="none" stroke="#5b6672" stroke-width=".8"/>
+      <rect x="45" y="170" width="10" height="4.2" rx="1" fill="none" stroke="#5b6672" stroke-width=".8"/>
+      ${sideTokens('home', d.lineups?.home, cur.line, hf, hs)}
+      ${sideTokens('away', d.lineups?.away, cur.line, af, as)}
+    </svg>`;
+  }
+
+  function iceView(d) {
+    const g = cur.game;
+    const n = Math.max(d.lineups?.home?.lines.length || 0, d.lineups?.away?.lines.length || 0, 1);
+    if (cur.line > n) cur.line = 1;
+    const chips = `<div class="hk-chips" role="group" aria-label="Reihe">${Array.from({ length: n }, (_, i) => `<button type="button" class="hk-chip${cur.line === i + 1 ? ' active' : ''}" data-hdline="${i + 1}">${i + 1}. Reihe</button>`).join('')}</div>`;
+    const head = (t) => `<div class="hd-rink-team">${logo(t.logo)}<b>${esc(t.name)}</b></div>`;
+    return `${chips}<div class="hd-rink-wrap">${head(g.home)}${rinkSvg(d)}${head(g.away)}</div>`;
+  }
+
+  function viewToggle() {
+    return `<div class="hk-chips" role="group" aria-label="Ansicht">${[['ice', 'Eisfläche'], ['list', 'Liste']].map(([v, l]) => `<button type="button" class="hk-chip${cur.view === v ? ' active' : ''}" data-hdview="${v}">${l}</button>`).join('')}</div>`;
+  }
+
+
   function availableTabs(d) {
     const tabs = [['verlauf', 'Spielverlauf']];
     if (hasLineups(d)) tabs.push(['lineup', 'Aufstellung']);
@@ -239,7 +330,10 @@
     const prev = $scroll.scrollTop;
     let html = '';
     if (cur.tab === 'verlauf') html = verlauf(d);
-    else if (cur.tab === 'lineup') html = lineupOf(cur.game.home, d.lineups.home) + lineupOf(cur.game.away, d.lineups.away);
+    else if (cur.tab === 'lineup') {
+      const lists = lineupOf(cur.game.home, d.lineups.home) + lineupOf(cur.game.away, d.lineups.away);
+      html = viewToggle() + (cur.view === 'ice' ? iceView(d) : lists);
+    }
     else html = vergleich(d);
     const err = (d.errors || []).length ? `<div class="gc-note">Teilweise nicht verfügbar: ${esc(d.errors.join(', '))}</div>` : '';
     $body.innerHTML = `${html}${err}<div class="gc-foot"><a href="${esc(cur.game.url)}" target="_blank" rel="noopener">Auf Hockeyweb ansehen ↗</a></div>`;

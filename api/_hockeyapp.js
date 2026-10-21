@@ -225,7 +225,7 @@ function mapEvents(payload, homeId, awayId) {
 // matchTeamPlayer → Aufstellung: Torhüter, Reihen (Verteidiger/Sturm), Ersatzbank
 function mapLineup(payload) {
   const list = asList(payload?.matchTeamPlayer?.teamPlayer);
-  const p = (x) => ({ nr: x.shirtNumber ?? '', name: `${x.firstName || ''} ${x.lastName || ''}`.trim(), pos: x.positionName || '', nation: x['alpha-2'] || '' });
+  const p = (x) => ({ nr: x.shirtNumber ?? '', name: `${x.firstName || ''} ${x.lastName || ''}`.trim(), last: String(x.lastName || x.firstName || '').trim(), pos: x.positionName || '', nation: x['alpha-2'] || '' });
   const field = list.filter((x) => Number(x.type) === 14);
   const bench = list.filter((x) => Number(x.type) !== 14).map(p);
   const goalies = field.filter((x) => Number(x.position) === 11).map(p);

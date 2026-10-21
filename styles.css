@@ -874,3 +874,12 @@ dialog.pf::backdrop { background: rgba(0, 0, 0, .7); backdrop-filter: blur(4px);
 .hk-chip:hover { color: var(--text); }
 .hk-chip.active { background: var(--text); color: var(--bg); border-color: var(--text); }
 .hk-chips .sep { width: 1px; height: 18px; background: var(--border-strong); margin: 0 4px; }
+
+/* Eisfläche (Aufstellung) */
+.hd-rink-wrap { max-width: 420px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
+.hd-rink-team { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.hd-rink-team img { width: 22px; height: 22px; object-fit: contain; }
+.hd-rink { width: 100%; height: auto; display: block; border-radius: 28px; filter: drop-shadow(0 10px 24px rgba(0, 0, 0, .45)); }
+.hd-tok { animation: hd-pop .35s cubic-bezier(.2, 1.4, .4, 1) both; transform-box: fill-box; }
+@keyframes hd-pop { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .hd-tok { animation: none; } }

@@ -138,6 +138,7 @@ test('mapLineup: Torhüter, Reihen, Ersatzbank', () => {
     p(15, 32, 'RV', 14, 'R2'), p(77, 0, '', 5, 'Bank'),
   ] } });
   assert.equal(l.goalies[0].name, 'V Tor');
+  assert.equal(l.goalies[0].last, 'Tor');
   assert.equal(l.lines.length, 2);
   assert.deepEqual(l.lines[0].defense.map((x) => x.pos), ['LV', 'RV']);
   assert.deepEqual(l.lines[0].forwards.map((x) => x.pos), ['LS', 'MS', 'RS']);
