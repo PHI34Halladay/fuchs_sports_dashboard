@@ -243,13 +243,12 @@
 
   function token(p, [x, y], fill, stroke, goalie, delay) {
     const ink = textOn(fill);
-    const w = Math.max(14, clip(p.last, 10).length * 2.6 + 4);
+    const nm = String(p.last); const w = Math.min(40, Math.max(14, nm.length * 1.9 + 5)); const tl = nm.length * 1.9 + 5 > 40 ? ` textLength="${w - 5}" lengthAdjust="spacingAndGlyphs"` : '';
     return `<g class="hd-tok" style="animation-delay:${delay}ms" transform="translate(${x} ${y})">
-      <circle r="5.6" cy="0" fill="${fill}" stroke="${stroke}" stroke-width="1.2"/>
-      ${goalie ? '<path d="M-5.6 -1.2 H5.6" stroke="' + stroke + '" stroke-width=".7" opacity=".7"/>' : ''}
-      <text y="1.9" text-anchor="middle" font-size="4.6" font-weight="800" fill="${ink}">${esc(p.nr)}</text>
-      <rect x="${-w / 2}" y="7" width="${w}" height="5.2" rx="2.6" fill="rgba(10,14,20,.82)"/>
-      <text y="10.7" text-anchor="middle" font-size="3" font-weight="700" fill="#fff">${esc(clip(p.last, 10))}</text>
+      <circle r="4.8" cy="0" fill="${fill}" stroke="${stroke}" stroke-width="1.2"/>
+      <text y="1.9" text-anchor="middle" font-size="3.9" font-weight="800" fill="${ink}">${esc(p.nr)}</text>
+      <rect x="${-w / 2}" y="6" width="${w}" height="5.2" rx="2.6" fill="rgba(10,14,20,.82)"/>
+      <text y="9.7" text-anchor="middle" font-size="3" font-weight="700" fill="#fff"${tl}>${esc(nm)}</text>
     </g>`;
   }
 
