@@ -78,7 +78,7 @@ vom Fussball.de-Logodienst (Hotlink).
   `ajax.team.prev.games`) und liefert JSON; Antworten werden 15 Minuten im Edge-Netz gecacht.
 - `api/_fussballde.js` enthält Mannschaftskonfiguration und Parser (`npm test` prüft ihn).
 - **Spiel-Popup** (Karte antippen, `amateurdetail.js` + `api/amateurgame.js`): Spielort mit Kartenlink, Vergleich der Mannschaften
-  (Tabellenplatz, Punkte, Torverhältnis, bester Torschütze, Karten), Form der letzten fünf Spiele (S grün, U grau, N rot), Anpfiff/Abpfiff, Vor-/Spielberichte als Links und bei gespielten Spielen der Spielverlauf (Minute, Art, Seite)
+  (Tabellenplatz, Punkte, Torverhältnis, bester Torschütze, Karten), Form der letzten fünf Spiele (S grün, U grau, N rot), Anpfiff/Abpfiff, Vor-/Spielberichte (öffnen im Lesemodus des Popups, Text über `/api/amateurgame?article=`) und bei gespielten Spielen der Spielverlauf (Minute, Art, Seite)
   sowie ein Link zur Spielseite (der Spielverlauf ist unvollständig: Tore ohne Elfmeter stehen dort nicht lesbar). Es wird nur angezeigt, was auf Fussball.de lesbar im HTML steht; Schiedsrichter, Aufstellungen,
   Spielernamen und Zwischenstände fehlen dort bzw. sind verschleiert. Die Function akzeptiert nur Spielseiten von `www.fussball.de`.
 - **Keine Torstände:** Fussball.de verschleiert Ergebnisse (jede Ziffer ist ein Sonderzeichen einer

@@ -1,7 +1,7 @@
 // Tests für das Spiel-Popup (Spielseite + Spielverlauf). Fixtures bilden die Struktur der Fussball.de-Seiten nach.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { gameId, courseUrl, parseGamePage, parseCourse } = require('../api/_fussballde');
+const { gameId, courseUrl, parseGamePage, parseCourse, isArticleUrl, parseArticle } = require('../api/_fussballde');
 
 const PUA = '';
 const LOGO = (id) => `//www.fussball.de/export.media/-/action/getLogo/format/5/id/${id}/verband/V1`;
@@ -99,4 +99,33 @@ test('Nur Spielseiten von Fussball.de sind erlaubt', () => {
     'https://www.fussball.de.evil.example/spiel/a/-/spiel/031CQOQ93S000000VS5489BUVUR5FS5A',
     'https://www.fussball.de/spiel/a/-/spiel/031CQOQ93S000000VS5489BUVUR5FS5A?x=1',
     'https://www.fussball.de/mannschaft/a/-/team-id/031CQOQ93S000000VS5489BUVUR5FS5A']) assert.equal(gameId(bad), null, bad);
+});
+
+const ARTICLE = `<html><head><title>Stürzt Gündelbach den Spitzenreiter? | FUSSBALL.DE</title></head><body>
+<div class="news-article">
+  <div class="header-image"></div><div>Anzeige</div>
+  <p class="article-lead-text">Kreisliga B6: Gündelbach – Riexingen (Sonntag, 15:00 Uhr)</p>
+  <p></p>
+  <p>Gündelbach hat am Sonntag den <a href="x">Tabellenführer</a> zu Gast &amp; will punkten.</p>
+  <p>Die Abwehr ist stark.</p>
+  <script>alert(1)</script>
+  <div class="article-meta">Autor/-in: FUSSBALL.DE (Dieser Text wurde automatisch erstellt)</div>
+</div><p>Außerhalb des Artikels</p></body></html>`;
+
+test('Bericht: Überschrift, Einleitung, Absätze und Quelle; nur Text', () => {
+  const a = parseArticle(ARTICLE);
+  assert.equal(a.title, 'Stürzt Gündelbach den Spitzenreiter?');
+  assert.equal(a.lead, 'Kreisliga B6: Gündelbach – Riexingen (Sonntag, 15:00 Uhr)');
+  assert.deepEqual(a.paras, ['Gündelbach hat am Sonntag den Tabellenführer zu Gast & will punkten.', 'Die Abwehr ist stark.']);
+  assert.equal(a.meta, 'Autor/-in: FUSSBALL.DE (Dieser Text wurde automatisch erstellt)');
+  assert.equal(parseArticle('<html>nix</html>'), null);
+  assert.equal(parseArticle(undefined), null);
+});
+
+test('Nur Berichte von Fussball.de sind erlaubt', () => {
+  const ok = 'https://www.fussball.de/mgc.newsdetail/-/article-uuid/032F4UVR4O000000VS5489BVVT0GJGMV';
+  assert.ok(isArticleUrl(ok));
+  for (const bad of ['', 'http://www.fussball.de/mgc.newsdetail/-/article-uuid/032F4UVR4O000000VS5489BVVT0GJGMV',
+    'https://evil.example/mgc.newsdetail/-/article-uuid/032F4UVR4O000000VS5489BVVT0GJGMV',
+    ok + '?x=1', 'https://www.fussball.de/spiel/a/-/spiel/032F4UVR4O000000VS5489BVVT0GJGMV']) assert.equal(isArticleUrl(bad), false, bad);
 });

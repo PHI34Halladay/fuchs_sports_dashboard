@@ -38,7 +38,12 @@
     document.body.classList.remove('modal-open');
   }
   dlg.addEventListener('close', () => { cur = null; document.body.classList.remove('modal-open'); });
-  dlg.addEventListener('click', (e) => { if (e.target === dlg || e.target.closest('.gc-close')) close(); });
+  dlg.addEventListener('click', (e) => {
+    if (e.target === dlg || e.target.closest('.gc-close')) { close(); return; }
+    const art = e.target.closest('[data-article]');
+    if (art) { openArticle(art); return; }
+    if (e.target.closest('[data-back]') && cur) { cur.view = 'game'; reqId++; render(); $scroll.scrollTop = 0; }
+  });
 
   function open(m, lg, logos = {}) {
     cur = { m, lg, logos, data: null };
@@ -121,17 +126,35 @@
   const FORM = { S: 'Sieg', U: 'Unentschieden', N: 'Niederlage' };
   const formHtml = (f) => (f ? `<span class="ad-form">${f.map((x) => `<i class="f-${x}" title="${FORM[x]}">${x}</i>`).join('')}</span>` : '–');
 
-  function cmpNum(label, a, b, lowerBetter) {
-    if (a == null || b == null) return '';
+  // Vergleich als dreispaltiges Raster: Heim | Merkmal | Gast (Zahlenwerte mit Balken darunter)
+  function cmpBar(a, b, lowerBetter) {
     const sum = a + b;
     let lp = sum ? (a / sum) * 100 : 50;
     if (lowerBetter && sum) lp = (b / sum) * 100;
-    return `<div class="gc-cmp">
-      <div class="gc-cmp-top"><span>${esc(a)}</span><span class="muted">${esc(label)}</span><span>${esc(b)}</span></div>
-      <div class="gc-cmp-bar"><i style="width:${lp}%;background:var(--c-home)"></i><i style="width:${100 - lp}%;background:var(--c-away)"></i></div>
-    </div>`;
+    return `<div class="ad-bar"><i style="width:${lp}%;background:var(--c-home)"></i><i style="width:${100 - lp}%;background:var(--c-away)"></i></div>`;
   }
-  const textRow = (label, a, b) => (a == null && b == null ? '' : `<div class="gc-cmp"><div class="gc-cmp-top"><span>${a ?? '–'}</span><span class="muted">${esc(label)}</span><span>${b ?? '–'}</span></div></div>`);
+  const cmpRow = (label, a, b, bar) => (a == null && b == null ? '' : `
+    <div class="ad-cmp">
+      <span class="ad-v l">${a ?? '–'}</span><span class="ad-k">${esc(label)}</span><span class="ad-v r">${b ?? '–'}</span>
+      ${bar || ''}
+    </div>`);
+  const num = (label, a, b, lowerBetter) => (a == null || b == null ? cmpRow(label, a, b) : cmpRow(label, esc(a), esc(b), cmpBar(a, b, lowerBetter)));
+
+  function vergleichHtml(c) {
+    if (!c) return '';
+    const sc = (p) => (p ? `${esc(p.name)} <span class="muted">(${p.goals})</span>` : null);
+    const rows = [
+      num('Tabellenplatz', c.home.place, c.away.place, true),
+      num('Punkte', c.home.points, c.away.points),
+      cmpRow('Torverhältnis', c.home.goals && esc(c.home.goals), c.away.goals && esc(c.away.goals)),
+      cmpRow('Bester Torjäger', sc(c.home.scorer), sc(c.away.scorer)),
+      cmpRow('Karten (Team/Offiz.)', c.home.cards && esc(c.home.cards), c.away.cards && esc(c.away.cards)),
+    ].join('');
+    if (!rows) return '';
+    const { m, logos } = cur;
+    const head = (name, cls) => `<div class="ad-cmp-team ${cls}">${logo(logos[name])}<span>${esc(name)}</span></div>`;
+    return section('Mannschaften im Vergleich', `<div class="ad-cmp-head">${head(m.home, 'l')}<span></span>${head(m.away, 'r')}</div>${rows}`);
+  }
 
   function formSection(c) {
     if (!c || (!c.home.form && !c.away.form)) return '';
@@ -140,25 +163,51 @@
     return section('Form (letzte 5 Spiele)', `${row(m.home, c.home.form)}${row(m.away, c.away.form)}<p class="muted ad-note">Grün = Sieg · Grau = Unentschieden · Rot = Niederlage, in der Reihenfolge von Fussball.de.</p>`);
   }
 
+  // Berichte öffnen direkt in der App (Lesemodus im Popup), nicht auf Fussball.de
   function newsHtml(list) {
     if (!list?.length) return '';
     const fmt = (ymd) => { const [y, mo, d] = String(ymd || '').split('-'); return y ? `${d}.${mo}.${y}` : ''; };
-    return section('Berichte & News', list.map((n) => `<a class="ad-news" href="${esc(n.url)}" target="_blank" rel="noopener noreferrer"><span class="muted">${esc(fmt(n.date))}${n.kind ? ` · ${esc(n.kind)}` : ''}</span><span>${esc(n.title)} ↗</span></a>`).join(''));
+    return section('Berichte & News', list.map((n) => `<button type="button" class="ad-news" data-article="${esc(n.url)}" data-title="${esc(n.title)}" data-kind="${esc(n.kind || '')}" data-date="${esc(n.date || '')}"><span class="muted">${esc(fmt(n.date))}${n.kind ? ` · ${esc(n.kind)}` : ''}</span><span>${esc(n.title)} ›</span></button>`).join(''));
   }
 
-  function vergleichHtml(c) {
-    if (!c) return '';
-    const sc = (p) => (p ? `${esc(p.name)} <span class="muted">(${p.goals})</span>` : null);
-    const rows = [
-      cmpNum('Tabellenplatz', c.home.place, c.away.place, true),
-      cmpNum('Punkte', c.home.points, c.away.points),
-      textRow('Torverhältnis', c.home.goals && esc(c.home.goals), c.away.goals && esc(c.away.goals)),
-      textRow('Bester Torjäger', sc(c.home.scorer), sc(c.away.scorer)),
-      textRow('Karten (Team/Offiz.)', c.home.cards && esc(c.home.cards), c.away.cards && esc(c.away.cards)),
-    ].join('');
-    if (!rows) return '';
-    const { m } = cur;
-    return section('Mannschaften im Vergleich', `<div class="gc-cmp-head"><span>${esc(m.home)}</span><span>${esc(m.away)}</span></div>${rows}`);
+  // ---------- Bericht lesen ----------
+  const artCache = new Map();
+  async function openArticle(btn) {
+    if (!cur) return;
+    const url = btn.dataset.article;
+    const info = { url, title: btn.dataset.title, kind: btn.dataset.kind, date: btn.dataset.date };
+    cur.view = 'article';
+    const id = ++reqId;
+    $scroll.scrollTop = 0;
+    $body.innerHTML = `<button type="button" class="ad-back" data-back>‹ Zurück zum Spiel</button><div class="gc-loading"><div class="skeleton"></div><div class="skeleton"></div></div>`;
+    try {
+      let a = artCache.get(url);
+      if (!a) {
+        const res = await fetch(`/api/amateurgame?${new URLSearchParams({ article: url })}`);
+        if (!res.ok) {
+          let msg = `Fehler ${res.status}`;
+          try { msg = (await res.json()).error || msg; } catch { /* ignore */ }
+          throw new Error(msg);
+        }
+        a = await res.json();
+        artCache.set(url, a);
+      }
+      if (id !== reqId || !cur || cur.view !== 'article') return;
+      const fmt = (ymd) => { const [y, mo, d] = String(ymd || '').split('-'); return y ? `${d}.${mo}.${y}` : ''; };
+      $body.innerHTML = `
+        <button type="button" class="ad-back" data-back>‹ Zurück zum Spiel</button>
+        <article class="gc-article rd">
+          <div class="rd-kicker">${esc([info.kind, fmt(info.date)].filter(Boolean).join(' · '))}</div>
+          <h2>${esc(a.title || info.title)}</h2>
+          ${a.lead ? `<p class="rd-lead">${esc(a.lead)}</p>` : ''}
+          ${a.paras.map((p) => `<p>${esc(p)}</p>`).join('')}
+          ${a.meta ? `<div class="gc-note">${esc(a.meta)}</div>` : ''}
+          <div class="gc-note">Quelle: Fussball.de</div>
+        </article>`;
+    } catch (e) {
+      if (id !== reqId || !cur || cur.view !== 'article') return;
+      $body.innerHTML = `<button type="button" class="ad-back" data-back>‹ Zurück zum Spiel</button><div class="status error">Der Bericht konnte nicht geladen werden: ${esc(e.message)}</div>`;
+    }
   }
 
   const EV = {

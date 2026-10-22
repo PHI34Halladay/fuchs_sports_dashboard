@@ -977,7 +977,21 @@ dialog.reader .gc-shell > .gc-scroll { padding-top: 0; }
 .ad-formteam { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; min-width: 0; }
 .ad-formteam img, .ad-formteam .hd-nologo { width: 24px; height: 24px; object-fit: contain; flex-shrink: 0; }
 .ad-meta { font-size: 14px; margin-top: 8px; }
-.ad-news { display: grid; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text); text-decoration: none; }
+
+/* Spiel-Popup Amateur: Vergleich als Raster, Berichte in der App */
+.ad-cmp-head { display: grid; grid-template-columns: 1fr 14px 1fr; gap: 8px; align-items: center; margin-bottom: 8px; }
+.ad-cmp-team { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; line-height: 1.2; min-width: 0; }
+.ad-cmp-team.r { justify-content: flex-end; text-align: right; flex-direction: row-reverse; }
+.ad-cmp-team img, .ad-cmp-team .hd-nologo { width: 28px; height: 28px; object-fit: contain; flex-shrink: 0; }
+.ad-cmp { display: grid; grid-template-columns: 1fr minmax(88px, auto) 1fr; gap: 4px 10px; align-items: baseline; padding: 9px 0; border-top: 1px solid var(--border); font-size: 14px; }
+.ad-v { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.ad-v.l { text-align: left; }
+.ad-v.r { text-align: right; }
+.ad-k { text-align: center; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .4px; }
+.ad-bar { grid-column: 1 / -1; display: flex; height: 5px; border-radius: 3px; overflow: hidden; gap: 2px; }
+.ad-bar i { display: block; height: 100%; }
+.ad-news { display: grid; gap: 2px; width: 100%; text-align: left; padding: 10px 0; background: none; border: 0; border-bottom: 1px solid var(--border); color: var(--text); font: inherit; font-size: 14px; cursor: pointer; }
 .ad-news:last-child { border-bottom: 0; }
-.ad-news span:last-child { color: var(--accent); }
-.ad .gc-cmp-top span:first-child, .ad .gc-cmp-top span:last-child { max-width: 42%; }
+.ad-news span:last-child { color: var(--accent); font-weight: 600; }
+.ad-back { background: none; border: 0; color: var(--accent); font: inherit; font-weight: 700; padding: 6px 0 12px; cursor: pointer; }
+.ad .rd p { line-height: 1.55; margin: 0 0 12px; }

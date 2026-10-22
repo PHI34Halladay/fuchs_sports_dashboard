@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '2.9.5';
+  const VERSION = '2.9.6';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -1152,7 +1152,7 @@
       lgId: lg.id, eventId, state: m.played ? 'post' : 'pre',
       mid: m.played ? '✓' : (m.time || 'offen'),
       statusHtml: m.played ? '<span class="mc-final">Beendet</span>' : `<span>${m.time ? 'Uhr' : 'Zeit offen'}</span>`,
-      note: [m.note, own ? (m.venue === 'H' ? 'Heimspiel' : 'Auswärtsspiel') : ''].filter(Boolean).join(' · '),
+      note: m.note || '',
       home: side(m.home), away: side(m.away),
       own: !!own,
       meta: m.competition || '',

@@ -7,7 +7,7 @@
 // (Minute, Art, Seite). Schiedsrichter, Zuschauer, Aufstellungen, Spielernamen und Zwischenstände sind dort
 // verschleiert oder fehlen und werden nicht ausgelesen.
 
-const { gameId, courseUrl, parseGamePage, parseCourse } = require('./_fussballde');
+const { gameId, courseUrl, parseGamePage, parseCourse, isArticleUrl, parseArticle } = require('./_fussballde');
 
 const UA = 'Mozilla/5.0 (compatible; sport-dashboard/1.12; privates Hobbyprojekt)';
 const TTL = 1800;
@@ -21,7 +21,30 @@ async function get(url) {
   return res.text();
 }
 
+// /api/amateurgame?article=<Bericht auf fussball.de> liefert den Text eines Vor-/Spielberichts.
+async function handleArticle(url, res) {
+  if (!isArticleUrl(url)) {
+    res.status(400).json({ error: 'Ungültiger Bericht' });
+    return;
+  }
+  try {
+    const article = parseArticle(await get(url));
+    if (!article) {
+      res.status(404).json({ error: 'Der Bericht enthält keinen lesbaren Text' });
+      return;
+    }
+    res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=14400');
+    res.status(200).json({ url, ...article });
+  } catch (e) {
+    res.status(502).json({ error: e.message || 'Fussball.de nicht erreichbar' });
+  }
+}
+
 async function handler(req, res) {
+  if ((req.query || {}).article) {
+    await handleArticle(String(req.query.article), res);
+    return;
+  }
   const url = String((req.query || {}).url || '');
   const id = gameId(url);
   if (!id) {

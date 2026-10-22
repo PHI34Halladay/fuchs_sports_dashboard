@@ -345,4 +345,27 @@ function parseCourse(html) {
   return events;
 }
 
-module.exports = { TEAMS, urlsFor, teamUrls, parseTable, parseMatches, mergeMatches, leagueGames, text, gameId, courseUrl, parseGamePage, parseCourse };
+// ---------- Berichte (Vorbericht/Spielbericht) ----------
+// Nur Artikel von Fussball.de sind erlaubt: https://www.fussball.de/mgc.newsdetail/-/article-uuid/<ID>
+const ARTICLE_URL = /^https:\/\/www\.fussball\.de\/mgc\.newsdetail\/-\/article-uuid\/[0-9A-Z]{20,48}$/;
+const isArticleUrl = (url) => ARTICLE_URL.test(String(url || ''));
+
+// Liest Überschrift, Einleitung, Absätze und Quellenzeile (nur Text, kein fremdes HTML).
+function parseArticle(html) {
+  const src = String(html || '');
+  const title = (/<title>([\s\S]*?)<\/title>/i.exec(src) || [])[1];
+  const start = src.search(/class="news-article\b/);
+  if (start < 0) return null;
+  let block = src.slice(start);
+  const metaAt = block.search(/class="article-meta\b/);
+  const meta = metaAt >= 0 ? plain((/class="article-meta[^"]*"[^>]*>([\s\S]*?)<\/div>/i.exec(block) || [])[1]) : null;
+  if (metaAt >= 0) block = block.slice(0, metaAt);
+  const lead = plain((/<p\b[^>]*class="[^"]*article-lead-text[^"]*"[^>]*>([\s\S]*?)<\/p>/i.exec(block) || [])[1]);
+  const paras = [...block.matchAll(/<p\b(?![^>]*article-lead-text)[^>]*>([\s\S]*?)<\/p>/gi)]
+    .map((m) => plain(m[1]))
+    .filter((t) => t && t !== 'Anzeige');
+  if (!lead && !paras.length) return null;
+  return { title: title ? plain(title).replace(/\s*\|.*$/, '') : null, lead, paras, meta };
+}
+
+module.exports = { TEAMS, urlsFor, teamUrls, parseTable, parseMatches, mergeMatches, leagueGames, text, gameId, courseUrl, parseGamePage, parseCourse, isArticleUrl, parseArticle };
