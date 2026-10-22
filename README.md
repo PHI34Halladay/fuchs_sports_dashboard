@@ -41,6 +41,7 @@ espn-dashboard/
 │   ├── espn.js     Vercel-Function: Proxy zur ESPN-API (CORS + Caching, inkl. Suche & Kader)
 │   ├── logo.js     Reicht Fussball.de-/Hockeyweb-Logos durch (für die Farberkennung)
 │   ├── amateur.js  Fussball.de (Kreisliga)
+│   ├── amateurgame.js  Fussball.de: Details für das Spiel-Popup (Kreisliga)
 │   └── hockey.js   Hockeyweb (Eishockey Europa)
 ├── vercel.json     Vercel-Einstellungen
 └── package.json
@@ -76,6 +77,10 @@ vom Fussball.de-Logodienst (Hotlink).
 - `api/amateur.js` liest die HTML-Fragmente der Mannschaftsseite (`ajax.team.table`, `ajax.team.matchplan`,
   `ajax.team.prev.games`) und liefert JSON; Antworten werden 15 Minuten im Edge-Netz gecacht.
 - `api/_fussballde.js` enthält Mannschaftskonfiguration und Parser (`npm test` prüft ihn).
+- **Spiel-Popup** (Karte antippen, `amateurdetail.js` + `api/amateurgame.js`): Spielort mit Kartenlink, Vergleich der Mannschaften
+  (Tabellenplatz, Punkte, Torverhältnis, Form, bester Torschütze, Karten) und bei gespielten Spielen der Spielverlauf (Minute, Art, Seite)
+  sowie ein Link zur Spielseite. Es wird nur angezeigt, was auf Fussball.de lesbar im HTML steht; Schiedsrichter, Aufstellungen,
+  Spielernamen und Zwischenstände fehlen dort bzw. sind verschleiert. Die Function akzeptiert nur Spielseiten von `www.fussball.de`.
 - **Keine Torstände:** Fussball.de verschleiert Ergebnisse (jede Ziffer ist ein Sonderzeichen einer
   seitenspezifischen Schriftart). Das wird bewusst nicht umgangen; gespielte Spiele verlinken auf den Spielbericht.
 - **Neue Saison:** In `TEAMS` (`api/_fussballde.js`) `saison`, `staffelId` und ggf. `league` anpassen

@@ -22,6 +22,9 @@
     },
     "api/hockey.js": {
       "maxDuration": 30
+    },
+    "api/amateurgame.js": {
+      "maxDuration": 30
     }
   }
 }

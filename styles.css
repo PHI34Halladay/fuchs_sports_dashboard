@@ -959,3 +959,18 @@ dialog.reader .gc-shell > .gc-scroll { padding-top: 0; }
 @keyframes liveRing { 50% { box-shadow: 0 0 0 11px color-mix(in srgb, var(--live) 8%, transparent); } }
 .live-group { display: inline-flex; align-items: center; gap: 9px; }
 .live-group .lg-logo { width: 26px; height: 26px; }
+
+/* Spiel-Popup für Amateurspiele (amateurdetail.js) */
+.ad-loc { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 14px; }
+.ad-loc a, .ad-link a { color: var(--accent); white-space: nowrap; }
+.ad-link { margin: 4px 0 0; text-align: center; font-size: 14px; }
+.ad-note { margin: 10px 0 0; font-size: 12px; }
+.ad-ev { display: grid; grid-template-columns: 44px 28px 1fr; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.ad-ev:last-of-type { border-bottom: 0; }
+.ad-ico { display: inline-block; min-width: 1.4em; }
+.ad-form { display: inline-flex; gap: 3px; }
+.ad-form i { font-style: normal; font-size: 11px; font-weight: 700; width: 20px; height: 20px; line-height: 20px; text-align: center; border-radius: 4px; color: #0b0e12; background: var(--muted); }
+.ad-form .f-S { background: var(--live); }
+.ad-form .f-U { background: var(--fav); }
+.ad-form .f-N { background: #ef6b6b; }
+.ad .gc-cmp-top span:first-child, .ad .gc-cmp-top span:last-child { max-width: 42%; }

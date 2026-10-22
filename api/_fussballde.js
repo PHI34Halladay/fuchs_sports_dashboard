@@ -224,4 +224,96 @@ function leagueGames(list, table) {
   return names.size ? list.filter((m) => names.has(m.home) && names.has(m.away)) : list;
 }
 
-module.exports = { TEAMS, urlsFor, teamUrls, parseTable, parseMatches, mergeMatches, leagueGames, text };
+// ---------- Spielseite (Popup) ----------
+// Nur Spielseiten von Fussball.de sind erlaubt (kein offener Proxy):
+//   https://www.fussball.de/spiel/<slug>/-/spiel/<ID>
+const GAME_URL = /^https:\/\/www\.fussball\.de\/spiel\/[a-z0-9-]+\/-\/spiel\/([0-9A-Z]{20,48})$/;
+function gameId(url) {
+  const m = GAME_URL.exec(String(url || ''));
+  return m ? m[1] : null;
+}
+const courseUrl = (id) => `${BASE}/ajax.match.course/-/mode/PAGE/spiel/${id}`;
+
+const PUA = /[\uE000-\uF8FF]/;
+// Zellen mit verschleierten Zeichen werden verworfen (nichts wird entschlüsselt).
+const plain = (s) => {
+  const t = text(s);
+  return t && !PUA.test(t) ? t : null;
+};
+
+function formOf(s) {
+  const f = String(s || '').split('|').map((x) => x.trim()).filter((x) => /^[SUN]$/.test(x));
+  return f.length ? f : null;
+}
+function scorerOf(s) {
+  const m = /^(.+?)\s*\((\d+)\)$/.exec(String(s || ''));
+  return m ? { name: m[1].trim(), goals: Number(m[2]) } : null;
+}
+
+// Liest Spielort und den Vergleich beider Mannschaften aus der Spielseite.
+// Schiedsrichter, Zuschauer und Aufstellung stehen dort nicht lesbar im HTML und werden nicht geliefert.
+function parseGamePage(html) {
+  const out = { location: null, compare: null, logos: { home: null, away: null } };
+  const src = String(html || '');
+
+  const head = /class="stage-header"[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/i.exec(src);
+  const loc = /<a\b[^>]*class="location"[^>]*>([\s\S]*?)<\/a>/i.exec(head ? head[0] : src);
+  if (loc) out.location = plain(loc[1]);
+
+  const tables = src.match(/<table\b[\s\S]*?<\/table>/gi) || [];
+  const tbl = tables.find((t) => /Aktuelle Platzierung/.test(t));
+  if (tbl) {
+    const rows = rowsOf(tbl);
+    const ths = [...(rows[0] || '').matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/gi)].map((m) => m[1]);
+    if (ths.length >= 3) {
+      out.logos.home = logoUrl(ths[0]);
+      out.logos.away = logoUrl(ths[2]);
+    }
+    const rec = { place: [null, null], points: [null, null], goals: [null, null], form: [null, null], scorer: [null, null], cards: [null, null] };
+    for (const row of rows.slice(1)) {
+      const c = cellsOf(row).map((x) => plain(x.html));
+      if (c.length < 3 || !c[1]) continue;
+      const set = (key, fn) => { rec[key] = [fn(c[0]), fn(c[2])]; };
+      if (/Platzierung/i.test(c[1])) set('place', (v) => (v ? toInt(v) : null));
+      else if (/Punkt/i.test(c[1])) set('points', (v) => (v ? toInt(v) : null));
+      else if (/Torverh/i.test(c[1])) set('goals', (v) => (v && /^\d+\s*:\s*\d+$/.test(v) ? v.replace(/\s+/g, '') : null));
+      else if (/Trend/i.test(c[1])) set('form', formOf);
+      else if (/Torj/i.test(c[1])) set('scorer', scorerOf);
+      else if (/Karten/i.test(c[1])) set('cards', (v) => (v && /^[\d\s/]+$/.test(v) ? v.replace(/\s+/g, '') : null));
+    }
+    if (Object.values(rec).some((p) => p[0] != null || p[1] != null)) {
+      out.compare = {
+        home: Object.fromEntries(Object.entries(rec).map(([k, v]) => [k, v[0]])),
+        away: Object.fromEntries(Object.entries(rec).map(([k, v]) => [k, v[1]])),
+      };
+    }
+  }
+  return out;
+}
+
+// Spielverlauf: nur Minute, Art und Seite. Spielernamen und Zwischenstände sind verschleiert
+// und werden verworfen.
+function parseCourse(html) {
+  const events = [];
+  const parts = String(html || '').split(/class="row-event\b/).slice(1);
+  for (const part of parts) {
+    const side = /^[^"]*\bevent-left\b/.test(part) ? 'home' : /^[^"]*\bevent-right\b/.test(part) ? 'away' : null;
+    const min = /class="valign-inner">\s*(\d{1,3})(?:\s*\+\s*(\d{1,2}))?\s*[’']/.exec(part);
+    if (!side || !min) continue;
+    const clean = part.replace(/<span\b[^>]*data-obfuscation[^>]*>[\s\S]*?<\/span>/gi, ' ');
+    const t = text(clean);
+    let type = null;
+    if (/Gelb-?\s?Rote/i.test(t)) type = 'yellowred';
+    else if (/Rote Karte/i.test(t)) type = 'red';
+    else if (/Gelbe Karte/i.test(t)) type = 'yellow';
+    else if (/Auswechslung/i.test(t)) type = 'sub';
+    else if (/Eigentor/i.test(t)) type = 'owngoal';
+    else if (/Strafsto\S*tor|Elfmeter\S*tor/i.test(t)) type = 'penalty';
+    else if (/\bTor\b/.test(t)) type = 'goal';
+    if (!type) continue;
+    events.push({ minute: Number(min[1]) + (min[2] ? Number(min[2]) / 100 : 0), label: `${min[1]}${min[2] ? `+${min[2]}` : ''}`, type, side });
+  }
+  return events;
+}
+
+module.exports = { TEAMS, urlsFor, teamUrls, parseTable, parseMatches, mergeMatches, leagueGames, text, gameId, courseUrl, parseGamePage, parseCourse };

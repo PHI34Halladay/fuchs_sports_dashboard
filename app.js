@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '2.7.0';
+  const VERSION = '2.8.0';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -1057,6 +1057,8 @@
     } catch { /* Fehler zeigt loadAmateur an */ }
   }
 
+  const amateurGameCache = new Map(); // "liga:spielId" → { Spiel, Logos } (für das Detail-Popup)
+
   function amateurModel(m, lg, logos = {}, showLeague = false) {
     const own = m.venue === 'H' ? m.home : m.venue === 'A' ? m.away : null;
     const side = (name) => ({
@@ -1065,8 +1067,11 @@
       score: null, sub: name === own ? 'SGM' : '',
     });
     const key = `${lg.id}:${m.matchNo || amTeamId(`${m.date}-${m.home}-${m.away}`)}`;
+    // Klick auf die Karte öffnet das Popup (nur mit Spielseite auf Fussball.de)
+    const eventId = m.url ? (m.matchNo || amTeamId(`${m.date}-${m.home}-${m.away}`)) : null;
+    if (eventId) amateurGameCache.set(`${lg.id}:${eventId}`, { m, logos });
     return {
-      lgId: lg.id, state: m.played ? 'post' : 'pre',
+      lgId: lg.id, eventId, state: m.played ? 'post' : 'pre',
       mid: m.played ? '✓' : (m.time || 'offen'),
       statusHtml: m.played ? '<span class="mc-final">Beendet</span>' : `<span>${m.time ? 'Uhr' : 'Zeit offen'}</span>`,
       note: [m.note, own ? (m.venue === 'H' ? 'Heimspiel' : 'Auswärtsspiel') : ''].filter(Boolean).join(' · '),
@@ -1614,6 +1619,11 @@
 
   function openGame(card) {
     const lg = leagueById(card.dataset.leagueId) || currentLeague();
+    if (lg.amateur) {
+      const hit = amateurGameCache.get(`${lg.id}:${card.dataset.event}`);
+      if (hit) window.AmateurDetail.open(hit.m, lg, { ...(hit.logos || {}) });
+      return;
+    }
     if (lg.hockey) {
       const g = hockeyGameCache.get(`${lg.id}:${card.dataset.event}`);
       if (g) window.HockeyDetail.open(g, lg);
