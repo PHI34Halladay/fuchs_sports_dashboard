@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '2.9.2';
+  const VERSION = '2.9.3';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -1142,7 +1142,7 @@
       name, favId: amTeamId(name),
       logoHtml: amLogo(logos[name]), logoUrl: amLogoOk(logos[name]) ? logos[name] : '',
       color: (AM_LOGO_COLORS[amLogoKey(name)] || [])[0], alt: (AM_LOGO_COLORS[amLogoKey(name)] || [])[1],
-      score: null, sub: name === own ? 'SGM' : '',
+      score: null, sub: '',
     });
     const key = `${lg.id}:${m.matchNo || amTeamId(`${m.date}-${m.home}-${m.away}`)}`;
     // Klick auf die Karte öffnet das Popup (nur mit Spielseite auf Fussball.de)

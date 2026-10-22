@@ -1,6 +1,6 @@
 {
   "name": "espn-dashboard",
-  "version": "2.9.2",
+  "version": "2.9.3",
   "private": true,
   "description": "Browser-Dashboard für Spielstände, Tabellen und News aus ESPN, Fussball.de und Hockeyweb",
   "scripts": {
