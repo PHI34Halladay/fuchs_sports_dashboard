@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '2.9.8';
+  const VERSION = '2.9.9';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -276,10 +276,10 @@
     const offset = Date.UTC(g('year'), g('month') - 1, g('day'), g('hour'), g('minute')) - guess;
     return guess - offset;
   }
-  // Countdown „1 Tag 23 Stunden 4 Minuten 15 Sekunden“ – Einheiten mit 0 werden ausgeblendet
+  // Countdown „1 Tag 23 Stunden 4 Minuten“ – Einheiten mit 0 werden ausgeblendet; Minuten aufgerundet (letzte Minute = „1 Minute“)
   function fmtCountdown(ms) {
-    let s = Math.max(0, Math.floor(ms / 1000));
-    const units = [[86400, 'Tag', 'Tage'], [3600, 'Stunde', 'Stunden'], [60, 'Minute', 'Minuten'], [1, 'Sekunde', 'Sekunden']];
+    let s = Math.max(0, Math.ceil(ms / 60000)) * 60;
+    const units = [[86400, 'Tag', 'Tage'], [3600, 'Stunde', 'Stunden'], [60, 'Minute', 'Minuten']];
     return units.map(([n, one, many]) => {
       const v = Math.floor(s / n); s -= v * n;
       return v ? `${v} ${v === 1 ? one : many}` : '';
