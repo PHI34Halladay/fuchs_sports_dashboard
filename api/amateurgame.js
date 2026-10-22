@@ -44,6 +44,7 @@ async function handler(req, res) {
     compare: info.compare,
     logos: info.logos,
     events,
+    errors: course.status === 'fulfilled' ? [] : [`Spielverlauf: ${course.reason?.message || 'nicht erreichbar'}`],
     fetchedAt: new Date().toISOString(),
   });
 }

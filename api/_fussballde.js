@@ -298,7 +298,7 @@ function parseCourse(html) {
   const parts = String(html || '').split(/class="row-event\b/).slice(1);
   for (const part of parts) {
     const side = /^[^"]*\bevent-left\b/.test(part) ? 'home' : /^[^"]*\bevent-right\b/.test(part) ? 'away' : null;
-    const min = /class="valign-inner">\s*(\d{1,3})(?:\s*\+\s*(\d{1,2}))?\s*[’']/.exec(part);
+    const min = /class="valign-inner">\s*(\d{1,3})(?:\s*\+\s*(\d{1,2}))?\s*(?:[’']|&rsquo;|&#0*(?:8217|39);|&apos;)/.exec(part);
     if (!side || !min) continue;
     const clean = part.replace(/<span\b[^>]*data-obfuscation[^>]*>[\s\S]*?<\/span>/gi, ' ');
     const t = text(clean);

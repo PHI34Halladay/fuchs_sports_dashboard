@@ -49,7 +49,7 @@ test('Spielseite ohne Daten liefert leere Felder statt Fehler', () => {
 });
 
 const ev = (side, minute, inner) => `<div class="row-event event-${side}">
-  <div class="column-time"><div class="hexagon green"><div class="inner"><div class="valign-wrapper"><div class="valign-inner">${minute}’</div></div></div></div></div>
+  <div class="column-time"><div class="hexagon green"><div class="inner"><div class="valign-wrapper"><div class="valign-inner">${minute}${minute % 2 ? '&rsquo;' : '’'}</div></div></div></div></div>
   <div class="column-event"><div class="valign-table"><div class="valign-cell">${inner}</div></div></div></div>`;
 const player = `<a href="https://www.fussball.de/spielerprofil/-/player-id/X"><div class="player-name"><span data-obfuscation="p1">${PUA}</span></div></a>`;
 const COURSE = [
