@@ -29,7 +29,7 @@ const TABLE_HTML = `<table>
 test('Tabelle wird gelesen', () => {
   const t = parseTable(TABLE_HTML);
   assert.equal(t.length, 3);
-  assert.deepEqual(t[0], { rank: 1, team: 'SGM Riexingen', played: 5, won: 4, drawn: 1, lost: 0, gf: 21, ga: 4, diff: 17, points: 13, own: false, teamId: 'TEAM1', logo: 'https://www.fussball.de/export.media/-/action/getLogo/format/0/id/LOGO1/verband/V1' });
+  assert.deepEqual(t[0], { rank: 1, team: 'SGM Riexingen', played: 5, won: 4, drawn: 1, lost: 0, gf: 21, ga: 4, diff: 17, points: 13, own: false, teamId: 'TEAM1', logo: 'https://www.fussball.de/export.media/-/action/getLogo/format/9/id/LOGO1/verband/V1' });
   assert.equal(t[1].team, 'SGM FC Gündelbach/TSV Häfnerhaslach'); // ohne Zero-Width-Space
   assert.equal(t[1].own, true);
   assert.equal(t[2].diff, -26);

@@ -89,7 +89,9 @@ function logoUrl(row) {
   if (!m) return null;
   const u = decode(m[1]);
   const abs = u.startsWith('//') ? `https:${u}` : u;
-  return abs.startsWith('https://www.fussball.de/export.media/') ? abs : null;
+  if (!abs.startsWith('https://www.fussball.de/export.media/')) return null;
+  // Der Logodienst liefert je nach "format" andere Größen (0 = 80 px, 9 = 200 px): immer die große nehmen.
+  return abs.replace(/\/format\/\d+\//, '/format/9/');
 }
 
 function parseTable(html) {

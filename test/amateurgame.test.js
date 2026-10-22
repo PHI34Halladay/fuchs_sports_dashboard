@@ -32,7 +32,7 @@ test('Spielseite: Ort und Vergleich werden gelesen, Logos nur vom Fussball.de-Lo
   assert.equal(g.compare.away.place, 10);
   assert.equal(g.compare.away.goals, '8:16');
   assert.deepEqual(g.compare.away.scorer, { name: 'Paulo Leite', goals: 2 });
-  assert.equal(g.logos.home, 'https://www.fussball.de/export.media/-/action/getLogo/format/5/id/H1/verband/V1');
+  assert.equal(g.logos.home, 'https://www.fussball.de/export.media/-/action/getLogo/format/9/id/H1/verband/V1');
   assert.equal(g.logos.away, null);
 });
 
