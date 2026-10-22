@@ -8,7 +8,7 @@
   'use strict';
 
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const logoOk = (u) => !!u && String(u).startsWith('https://www.fussball.de/export.media/');
+  const logoOk = (u) => !!u && (String(u).startsWith('https://www.fussball.de/export.media/') || String(u).startsWith('logos/kreisliga/'));
   const logo = (u) => (logoOk(u) ? `<img src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="hd-nologo"></span>');
   const cache = new Map(); // Spielseite → Antwort (kurz, schont Fussball.de bei erneutem Öffnen)
   const CACHE_MS = 5 * 60_000;

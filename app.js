@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '2.8.3';
+  const VERSION = '2.9.0';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -27,7 +27,7 @@
 
     { id: 'bl1', abbr: 'BL', name: 'Bundesliga', cat: 'soccer', group: 'Deutschland', sport: 'soccer', league: 'ger.1', color: '#e2001a' },
     { id: 'bl2', abbr: '2.BL', name: '2. Bundesliga', cat: 'soccer', group: 'Deutschland', sport: 'soccer', league: 'ger.2', color: '#ff3b4a' },
-    { id: 'kreis', abbr: 'KL', name: 'Kreisliga', cat: 'soccer', group: 'Deutschland', amateur: true, teams: ['sgm1', 'sgm2'], color: '#2fbf71' },
+    { id: 'kreis', abbr: 'KL', name: 'Kreisliga', cat: 'soccer', group: 'Deutschland', amateur: true, teams: ['sgm1', 'sgm2'], color: '#2fbf71', logo: 'logos/kreisliga.png' },
     { id: 'ucl', abbr: 'UCL', name: 'Champions League', cat: 'soccer', group: 'Europapokal', sport: 'soccer', league: 'uefa.champions', color: '#3c7bff' },
     { id: 'uel', abbr: 'UEL', name: 'Europa League', cat: 'soccer', group: 'Europapokal', sport: 'soccer', league: 'uefa.europa', color: '#ff7a00' },
     { id: 'uecl', abbr: 'UECL', name: 'Conference League', cat: 'soccer', group: 'Europapokal', sport: 'soccer', league: 'uefa.europa.conf', color: '#22c979' },
@@ -1028,7 +1028,7 @@
       try { msg = (await res.json()).error || msg; } catch { /* ignore */ }
       throw new Error(msg);
     }
-    const data = await res.json();
+    const data = amApplyLocalLogos(await res.json());
     amateurCache.set(teamKey, { t: Date.now(), data });
     return data;
   }
@@ -1037,11 +1037,52 @@
   const parseYMD = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, 12); };
 
   // Vereinslogo vom Fussball.de-Logodienst (Hotlink; nur diese Quelle ist erlaubt)
-  const amLogoOk = (url) => !!url && String(url).startsWith('https://www.fussball.de/export.media/');
+  const amLogoOk = (url) => !!url && (String(url).startsWith('https://www.fussball.de/export.media/') || String(url).startsWith('logos/kreisliga/'));
   const amLogo = (url) => (amLogoOk(url) ? `<img src="${esc(url)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '');
 
   // Team-ID für Favoriten: Mannschaftsname in Kurzform (Fussball.de liefert keine IDs im HTML)
   const amTeamId = (name) => String(name).toLowerCase().replace(/[^a-z0-9äöüß]+/g, '-').replace(/^-|-$/g, '');
+
+  // Eigene Vereinslogos (freigestellt, in logos/kreisliga/) haben Vorrang vor dem Fussball.de-Logo
+  const AM_LOCAL_LOGOS = new Set([
+    'aramäer-bietigheim',
+    'fv-kirchheim-ii',
+    'fv-sönmez-spor-bietigheim',
+    'sgm-fc-gündelbach-tsv-häfnerhaslach',
+    'sgm-fc-gündelbach-tsv-häfnerhaslach-ii',
+    'sgm-riexingen',
+    'sgm-sachsenheim-ii',
+    'sgm-sc-hohenhaslach-sv-freudental-ii',
+    'sgm-tsv-nussdorf-fv-roßwag-ii',
+    'sgm-vaihingen-enzweihingen-ii',
+    'sv-horrheim-ii',
+    'sv-illingen-ii',
+    'sv-iptingen',
+    'sv-iptingen-ii',
+    'sv-riet',
+    'sv-sternenfels',
+    'tsv-ensingen-ii',
+    'tsv-großglattbach',
+    'tsv-großglattbach-ii',
+    'tsv-kleinglattbach',
+    'tsv-kleinglattbach-ii',
+    'tsv-mühlhausen-enz',
+    'tsv-phönix-lomersheim-ii',
+    'tsv-wiernsheim',
+    'tsv-wiernsheim-ii',
+    'vfl-gemmrigheim',
+    'vfr-sersheim',
+  ]);
+  const amLocalLogo = (name) => { const id = amTeamId(name); return AM_LOCAL_LOGOS.has(id) ? `logos/kreisliga/${id}.png` : ''; };
+  function amApplyLocalLogos(data) {
+    const names = new Set(Object.keys(data.logos || {}));
+    (data.table || []).forEach((r) => names.add(r.team));
+    [...(data.upcoming || []), ...(data.past || [])].forEach((m) => { names.add(m.home); names.add(m.away); });
+    data.logos = data.logos || {};
+    names.forEach((n) => { const u = amLocalLogo(n); if (u) data.logos[n] = u; });
+    (data.table || []).forEach((r) => { const u = amLocalLogo(r.team); if (u) r.logo = u; });
+    return data;
+  }
 
   async function amateurGameDays(lg) {
     const all = await Promise.all(kreisTeams(lg).map((t) => amateurData(t).catch(() => null)));
