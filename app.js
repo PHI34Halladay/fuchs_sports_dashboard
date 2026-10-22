@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '2.9.6';
+  const VERSION = '2.9.7';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';

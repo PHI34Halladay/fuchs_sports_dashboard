@@ -131,7 +131,7 @@
     const sum = a + b;
     let lp = sum ? (a / sum) * 100 : 50;
     if (lowerBetter && sum) lp = (b / sum) * 100;
-    return `<div class="ad-bar"><i style="width:${lp}%;background:var(--c-home)"></i><i style="width:${100 - lp}%;background:var(--c-away)"></i></div>`;
+    return `<div class="ad-bar"><i class="h" style="width:${lp}%"></i><i class="a" style="width:${100 - lp}%"></i></div>`;
   }
   const cmpRow = (label, a, b, bar) => (a == null && b == null ? '' : `
     <div class="ad-cmp">

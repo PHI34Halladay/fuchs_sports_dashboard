@@ -990,6 +990,8 @@ dialog.reader .gc-shell > .gc-scroll { padding-top: 0; }
 .ad-k { text-align: center; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .4px; }
 .ad-bar { grid-column: 1 / -1; display: flex; height: 5px; border-radius: 3px; overflow: hidden; gap: 2px; }
 .ad-bar i { display: block; height: 100%; }
+.ad-bar i.h { background: var(--accent); }
+.ad-bar i.a { background: #8d97a5; }
 .ad-news { display: grid; gap: 2px; width: 100%; text-align: left; padding: 10px 0; background: none; border: 0; border-bottom: 1px solid var(--border); color: var(--text); font: inherit; font-size: 14px; cursor: pointer; }
 .ad-news:last-child { border-bottom: 0; }
 .ad-news span:last-child { color: var(--accent); font-weight: 600; }
