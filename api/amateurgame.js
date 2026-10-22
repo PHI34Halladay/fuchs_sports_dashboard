@@ -3,8 +3,9 @@
 // Erlaubt sind nur Spielseiten von www.fussball.de (siehe gameId in _fussballde.js) – kein offener Proxy.
 //
 // Geliefert wird nur, was auf Fussball.de lesbar im HTML steht: Spielort, Vergleich der Mannschaften
-// (Platz, Punkte, Tore, Form, Torjäger, Karten) und der Spielverlauf (Minute, Art, Seite).
-// Schiedsrichter, Aufstellungen, Spielernamen und Zwischenstände stehen dort nicht lesbar und fehlen.
+// (Platz, Punkte, Tore, Form, Torjäger, Karten), Anpfiff/Abpfiff, Vor-/Spielberichte und der Spielverlauf
+// (Minute, Art, Seite). Schiedsrichter, Zuschauer, Aufstellungen, Spielernamen und Zwischenstände sind dort
+// verschleiert oder fehlen und werden nicht ausgelesen.
 
 const { gameId, courseUrl, parseGamePage, parseCourse } = require('./_fussballde');
 
@@ -43,6 +44,8 @@ async function handler(req, res) {
     location: info.location,
     compare: info.compare,
     logos: info.logos,
+    times: info.times,
+    news: info.news,
     events,
     errors: course.status === 'fulfilled' ? [] : [`Spielverlauf: ${course.reason?.message || 'nicht erreichbar'}`],
     fetchedAt: new Date().toISOString(),

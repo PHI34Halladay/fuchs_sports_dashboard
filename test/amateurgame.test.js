@@ -23,7 +23,15 @@ const PAGE = `<div class="stage-header">
   ${cmpRow('<a>Juri Grinko (3)</a>', 'Bester Torjäger (Tore)', `<a>Paulo Leite (2)</a>`)}
   ${cmpRow('13 / 00 / 00 / 0', 'Karten (Team/Offiz.)', `9 / 11 / ${PUA} / 1`)}
   </tbody>
-</table>`;
+</table>
+<div class="headline"><h3>Anpfiff <span>15:00Uhr</span></h3></div>
+<div class="final"><div class="headline"><h3>Abpfiff 16:45Uhr</h3></div></div>
+<div class="ticker-container match"><h2>Spielberichte &amp; News</h2><table class="ticker table">
+  <tr class="odd row-headline visible-small"><td class="column-date">21.10.2026 | Vorbericht</td></tr>
+  <tr class="odd"><td class="column-date">21.10.2026</td><td class="column-name"><a href="https://www.fussball.de/mgc.newsdetail/-/article-uuid/ABC123">Stürzt Gündelbach den Spitzenreiter?</a></td></tr>
+  <tr class="odd row-headline visible-small"><td class="column-date">22.10.2026 | Spielbericht</td></tr>
+  <tr class="odd"><td class="column-date">22.10.2026</td><td class="column-name"><a href="https://evil.example/x">Fremder Link</a></td></tr>
+</table></div>`;
 
 test('Spielseite: Ort und Vergleich werden gelesen, Logos nur vom Fussball.de-Logodienst', () => {
   const g = parseGamePage(PAGE);
@@ -36,6 +44,12 @@ test('Spielseite: Ort und Vergleich werden gelesen, Logos nur vom Fussball.de-Lo
   assert.equal(g.logos.away, null);
 });
 
+test('Spielseite: Anpfiff, Abpfiff und Berichte; fremde Links werden verworfen', () => {
+  const g = parseGamePage(PAGE);
+  assert.deepEqual(g.times, { kickoff: '15:00', final: '16:45' });
+  assert.deepEqual(g.news, [{ date: '2026-10-21', kind: 'Vorbericht', title: 'Stürzt Gündelbach den Spitzenreiter?', url: 'https://www.fussball.de/mgc.newsdetail/-/article-uuid/ABC123' }]);
+});
+
 test('Spielseite: verschleierte Zellen werden verworfen, nichts davon landet im Ergebnis', () => {
   const g = parseGamePage(PAGE);
   assert.equal(g.compare.away.cards, null);
@@ -43,7 +57,7 @@ test('Spielseite: verschleierte Zellen werden verworfen, nichts davon landet im 
 });
 
 test('Spielseite ohne Daten liefert leere Felder statt Fehler', () => {
-  assert.deepEqual(parseGamePage(''), { location: null, compare: null, logos: { home: null, away: null } });
+  assert.deepEqual(parseGamePage(''), { location: null, compare: null, logos: { home: null, away: null }, times: { kickoff: null, final: null }, news: [] });
   assert.equal(parseGamePage('<html>nix</html>').compare, null);
   assert.equal(parseGamePage(undefined).location, null);
 });

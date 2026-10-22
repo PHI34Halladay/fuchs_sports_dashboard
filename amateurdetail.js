@@ -106,10 +106,16 @@
   const section = (title, html) => `<section class="gc-sec"><h3>${esc(title)}</h3>${html}</section>`;
   const linkHtml = () => (cur.m.url ? `<p class="ad-link"><a href="${esc(cur.m.url)}" target="_blank" rel="noopener noreferrer">${cur.m.played ? 'Spielbericht und Ergebnis' : 'Spielseite'} auf Fussball.de ↗</a></p>` : '');
 
-  function ortHtml(loc) {
-    if (!loc) return '';
-    const maps = `https://www.google.com/maps/search/?${new URLSearchParams({ api: '1', query: loc })}`;
-    return section('Spielort', `<div class="ad-loc"><span>${esc(loc)}</span><a href="${esc(maps)}" target="_blank" rel="noopener noreferrer">Karte ↗</a></div>`);
+  function ortHtml(loc, times) {
+    const maps = loc ? `https://www.google.com/maps/search/?${new URLSearchParams({ api: '1', query: loc })}` : '';
+    const rows = [];
+    if (loc) rows.push(`<div class="ad-loc"><span>${esc(loc)}</span><a href="${esc(maps)}" target="_blank" rel="noopener noreferrer">Karte ↗</a></div>`);
+    const t = [times?.kickoff ? `Anpfiff ${esc(times.kickoff)} Uhr` : '', times?.final ? `Abpfiff ${esc(times.final)} Uhr` : ''].filter(Boolean);
+    if (t.length) rows.push(`<div class="ad-meta">${t.join(' · ')}</div>`);
+    const { m } = cur;
+    const info = [m.competition, m.matchNo ? `Spiel ${m.matchNo}` : ''].filter(Boolean);
+    if (info.length) rows.push(`<div class="ad-meta muted">${info.map(esc).join(' · ')}</div>`);
+    return rows.length ? section('Spielort & Zeiten', rows.join('')) : '';
   }
 
   const FORM = { S: 'Sieg', U: 'Unentschieden', N: 'Niederlage' };
@@ -127,6 +133,19 @@
   }
   const textRow = (label, a, b) => (a == null && b == null ? '' : `<div class="gc-cmp"><div class="gc-cmp-top"><span>${a ?? '–'}</span><span class="muted">${esc(label)}</span><span>${b ?? '–'}</span></div></div>`);
 
+  function formSection(c) {
+    if (!c || (!c.home.form && !c.away.form)) return '';
+    const { m, logos } = cur;
+    const row = (name, f) => `<div class="ad-formrow"><span class="ad-formteam">${logo(logos[name])}<span>${esc(name)}</span></span>${formHtml(f)}</div>`;
+    return section('Form (letzte 5 Spiele)', `${row(m.home, c.home.form)}${row(m.away, c.away.form)}<p class="muted ad-note">Grün = Sieg · Grau = Unentschieden · Rot = Niederlage, in der Reihenfolge von Fussball.de.</p>`);
+  }
+
+  function newsHtml(list) {
+    if (!list?.length) return '';
+    const fmt = (ymd) => { const [y, mo, d] = String(ymd || '').split('-'); return y ? `${d}.${mo}.${y}` : ''; };
+    return section('Berichte & News', list.map((n) => `<a class="ad-news" href="${esc(n.url)}" target="_blank" rel="noopener noreferrer"><span class="muted">${esc(fmt(n.date))}${n.kind ? ` · ${esc(n.kind)}` : ''}</span><span>${esc(n.title)} ↗</span></a>`).join(''));
+  }
+
   function vergleichHtml(c) {
     if (!c) return '';
     const sc = (p) => (p ? `${esc(p.name)} <span class="muted">(${p.goals})</span>` : null);
@@ -134,7 +153,6 @@
       cmpNum('Tabellenplatz', c.home.place, c.away.place, true),
       cmpNum('Punkte', c.home.points, c.away.points),
       textRow('Torverhältnis', c.home.goals && esc(c.home.goals), c.away.goals && esc(c.away.goals)),
-      textRow('Form', c.home.form ? formHtml(c.home.form) : null, c.away.form ? formHtml(c.away.form) : null),
       textRow('Bester Torjäger', sc(c.home.scorer), sc(c.away.scorer)),
       textRow('Karten (Team/Offiz.)', c.home.cards && esc(c.home.cards), c.away.cards && esc(c.away.cards)),
     ].join('');
@@ -156,12 +174,12 @@
       const name = e.side === 'home' ? m.home : m.away;
       return `<div class="ad-ev"><span class="gc-time">${esc(e.label)}’</span><span class="hd-tl">${logo(logos[name])}</span><span><span class="ad-ico">${ico}</span> ${esc(label)} <span class="muted">${esc(name)}</span></span></div>`;
     }).join('');
-    return section('Spielverlauf', `${rows}<p class="muted ad-note">Fussball.de zeigt Spielernamen, Zwischenstände und einen Teil der Ereignisse (z. B. Tore) nicht lesbar an – die Liste ist deshalb unvollständig.</p>`);
+    return section('Spielverlauf', `${rows}<p class="muted ad-note">Fussball.de zeigt Spielernamen, Zwischenstände und einen Teil der Ereignisse (z. B. Tore) nicht lesbar an – die Liste ist deshalb unvollständig. Schiedsrichter, Assistenten und Zuschauer sind dort ebenfalls nicht lesbar.</p>`);
   }
 
   function render() {
     const d = cur.data;
-    const html = ortHtml(d.location) + vergleichHtml(d.compare) + verlaufHtml(d.events);
+    const html = ortHtml(d.location, d.times) + vergleichHtml(d.compare) + formSection(d.compare) + verlaufHtml(d.events) + newsHtml(d.news);
     $body.innerHTML = (html || '<div class="gc-empty">Zu diesem Spiel gibt es noch keine lesbaren Angaben.</div>') + linkHtml();
     if (d.compare) {
       // Logos aus der Spielseite nur, wenn die Tabelle keine geliefert hat

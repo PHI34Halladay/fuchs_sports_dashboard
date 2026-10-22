@@ -969,8 +969,15 @@ dialog.reader .gc-shell > .gc-scroll { padding-top: 0; }
 .ad-ev:last-of-type { border-bottom: 0; }
 .ad-ico { display: inline-block; min-width: 1.4em; }
 .ad-form { display: inline-flex; gap: 3px; }
-.ad-form i { font-style: normal; font-size: 11px; font-weight: 700; width: 20px; height: 20px; line-height: 20px; text-align: center; border-radius: 4px; color: #0b0e12; background: var(--muted); }
-.ad-form .f-S { background: var(--live); }
-.ad-form .f-U { background: var(--fav); }
-.ad-form .f-N { background: #ef6b6b; }
+.ad-form i { font-style: normal; font-size: 12px; font-weight: 800; width: 26px; height: 26px; line-height: 26px; text-align: center; border-radius: 6px; color: #0b0e12; background: var(--muted); }
+.ad-form .f-S { background: var(--win); }
+.ad-form .f-U { background: #8d97a5; }
+.ad-form .f-N { background: #ff4757; color: #fff; }
+.ad-formrow { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 6px 0; }
+.ad-formteam { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; min-width: 0; }
+.ad-formteam img, .ad-formteam .hd-nologo { width: 24px; height: 24px; object-fit: contain; flex-shrink: 0; }
+.ad-meta { font-size: 14px; margin-top: 8px; }
+.ad-news { display: grid; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text); text-decoration: none; }
+.ad-news:last-child { border-bottom: 0; }
+.ad-news span:last-child { color: var(--accent); }
 .ad .gc-cmp-top span:first-child, .ad .gc-cmp-top span:last-child { max-width: 42%; }

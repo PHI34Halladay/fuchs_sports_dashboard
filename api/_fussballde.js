@@ -255,12 +255,39 @@ function scorerOf(s) {
 // Liest Spielort und den Vergleich beider Mannschaften aus der Spielseite.
 // Schiedsrichter, Zuschauer und Aufstellung stehen dort nicht lesbar im HTML und werden nicht geliefert.
 function parseGamePage(html) {
-  const out = { location: null, compare: null, logos: { home: null, away: null } };
+  const out = { location: null, compare: null, logos: { home: null, away: null }, times: { kickoff: null, final: null }, news: [] };
   const src = String(html || '');
 
   const head = /class="stage-header"[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/i.exec(src);
   const loc = /<a\b[^>]*class="location"[^>]*>([\s\S]*?)<\/a>/i.exec(head ? head[0] : src);
   if (loc) out.location = plain(loc[1]);
+
+  // Anpfiff/Abpfiff stehen als Überschrift mit Uhrzeit im Klartext
+  const clock = (label) => {
+    const m = new RegExp(`>\\s*${label}\\b[^:]{0,200}?(\\d{1,2}):(\\d{2})`).exec(src);
+    return m ? `${m[1].padStart(2, '0')}:${m[2]}` : null;
+  };
+  out.times = { kickoff: clock('Anpfiff'), final: clock('Abpfiff') };
+
+  // Vor-/Spielberichte und News zum Spiel (Datum | Art, Überschrift, Link)
+  const tick = /class="ticker-container[\s\S]*?<\/table>/i.exec(src);
+  if (tick) {
+    let pending = null;
+    for (const row of rowsOf(tick[0])) {
+      if (/row-headline/.test(classOf(row))) {
+        const t = text(row);
+        const d = /(\d{2})\.(\d{2})\.(\d{4})/.exec(t);
+        pending = d ? { date: `${d[3]}-${d[2]}-${d[1]}`, kind: t.includes('|') ? t.split('|').pop().trim() : '' } : null;
+        continue;
+      }
+      const cell = cellsOf(row).find((c) => /column-name/.test(c.attrs));
+      if (!cell) continue;
+      const title = plain(cell.html);
+      const href = (/href="(https:\/\/www\.fussball\.de\/mgc\.newsdetail\/[^"]+)"/i.exec(row) || [])[1];
+      if (title && href) out.news.push({ date: pending?.date || null, kind: pending?.kind || '', title, url: decode(href) });
+      pending = null;
+    }
+  }
 
   const tables = src.match(/<table\b[\s\S]*?<\/table>/gi) || [];
   const tbl = tables.find((t) => /Aktuelle Platzierung/.test(t));
