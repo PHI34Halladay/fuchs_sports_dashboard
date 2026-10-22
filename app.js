@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '2.9.0';
+  const VERSION = '2.9.1';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -1073,7 +1073,12 @@
     'vfl-gemmrigheim',
     'vfr-sersheim',
   ]);
-  const amLocalLogo = (name) => { const id = amTeamId(name); return AM_LOCAL_LOGOS.has(id) ? `logos/kreisliga/${id}.png` : ''; };
+  const AM_LOGO_ALIAS = [[/gemmrigheim/, 'vfl-gemmrigheim'], [/horrheim/, 'sv-horrheim-ii']]; // z. B. SGM Gemmrigheim/Walheim
+  const amLocalLogo = (name) => {
+    const id = amTeamId(name);
+    const key = AM_LOCAL_LOGOS.has(id) ? id : (AM_LOGO_ALIAS.find(([re]) => re.test(id)) || [])[1];
+    return key ? `logos/kreisliga/${key}.png` : '';
+  };
   function amApplyLocalLogos(data) {
     const names = new Set(Object.keys(data.logos || {}));
     (data.table || []).forEach((r) => names.add(r.team));
