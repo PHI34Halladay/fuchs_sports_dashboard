@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '2.9.3';
+  const VERSION = '2.9.4';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -27,7 +27,7 @@
 
     { id: 'bl1', abbr: 'BL', name: 'Bundesliga', cat: 'soccer', group: 'Deutschland', sport: 'soccer', league: 'ger.1', color: '#e2001a' },
     { id: 'bl2', abbr: '2.BL', name: '2. Bundesliga', cat: 'soccer', group: 'Deutschland', sport: 'soccer', league: 'ger.2', color: '#ff3b4a' },
-    { id: 'kreis', abbr: 'KL', name: 'Kreisliga', cat: 'soccer', group: 'Deutschland', amateur: true, teams: ['sgm1', 'sgm2'], color: '#2fbf71', logo: 'logos/kreisliga.png' },
+    { id: 'kreis', abbr: 'KL', name: 'Kreisliga', cat: 'soccer', group: 'Deutschland', amateur: true, teams: ['sgm1', 'sgm2'], color: '#ff1a00', logo: 'logos/kreisliga.png' },
     { id: 'ucl', abbr: 'UCL', name: 'Champions League', cat: 'soccer', group: 'Europapokal', sport: 'soccer', league: 'uefa.champions', color: '#3c7bff' },
     { id: 'uel', abbr: 'UEL', name: 'Europa League', cat: 'soccer', group: 'Europapokal', sport: 'soccer', league: 'uefa.europa', color: '#ff7a00' },
     { id: 'uecl', abbr: 'UECL', name: 'Conference League', cat: 'soccer', group: 'Europapokal', sport: 'soccer', league: 'uefa.europa.conf', color: '#22c979' },
