@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '2.9.1';
+  const VERSION = '2.9.2';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -1073,12 +1073,43 @@
     'vfl-gemmrigheim',
     'vfr-sersheim',
   ]);
-  const AM_LOGO_ALIAS = [[/gemmrigheim/, 'vfl-gemmrigheim'], [/horrheim/, 'sv-horrheim-ii']]; // z. B. SGM Gemmrigheim/Walheim
-  const amLocalLogo = (name) => {
-    const id = amTeamId(name);
-    const key = AM_LOCAL_LOGOS.has(id) ? id : (AM_LOGO_ALIAS.find(([re]) => re.test(id)) || [])[1];
-    return key ? `logos/kreisliga/${key}.png` : '';
+  // Primär-/Sekundärfarbe je Vereinslogo (aus dem Logo berechnet) – für die Kartenfarben wie bei den anderen Ligen
+  const AM_LOGO_COLORS = {
+    'aramäer-bietigheim': ['ffe904', 'd90710'],
+    'fv-kirchheim-ii': ['090a74', '4e518f'],
+    'fv-sönmez-spor-bietigheim': ['cf0308', 'fbe403'],
+    'sgm-fc-gündelbach-tsv-häfnerhaslach-ii': ['07acf0', '326598'],
+    'sgm-fc-gündelbach-tsv-häfnerhaslach': ['07acf0', '326598'],
+    'sgm-riexingen': ['faf02a', '2f556f'],
+    'sgm-sachsenheim-ii': ['a1001d', '4e0810'],
+    'sgm-sc-hohenhaslach-sv-freudental-ii': ['ab956a', 'cb2711'],
+    'sgm-tsv-nussdorf-fv-roßwag-ii': ['e71a1e', '4e267c'],
+    'sgm-vaihingen-enzweihingen-ii': ['cd1724', '0f439b'],
+    'sv-horrheim-ii': ['e5241f', 'e68f90'],
+    'sv-illingen-ii': ['1764f5', '77a5f6'],
+    'sv-iptingen-ii': ['038d37', '4fa96f'],
+    'sv-iptingen': ['038d37', '4fa96f'],
+    'sv-riet': ['d0d0d0', '515151'],
+    'sv-sternenfels': ['007b44', '70b18f'],
+    'tsv-ensingen-ii': ['feee03', '1d1d1b'],
+    'tsv-großglattbach-ii': ['702932', '956d71'],
+    'tsv-großglattbach': ['702932', '956d71'],
+    'tsv-kleinglattbach-ii': ['2c9638', '0f3813'],
+    'tsv-kleinglattbach': ['2c9638', '0f3813'],
+    'tsv-mühlhausen-enz': ['0991f9', '92cdf5'],
+    'tsv-phönix-lomersheim-ii': ['fce611', '042ffb'],
+    'tsv-wiernsheim-ii': ['fb0a08', '300909'],
+    'tsv-wiernsheim': ['fb0a08', '300909'],
+    'vfl-gemmrigheim': ['02a752', '91d8b3'],
+    'vfr-sersheim': ['229a34', '8bc692'],
   };
+  const AM_LOGO_ALIAS = [[/gemmrigheim/, 'vfl-gemmrigheim'], [/horrheim/, 'sv-horrheim-ii']]; // z. B. SGM Gemmrigheim/Walheim
+  const amLogoKey = (name) => {
+    const id = amTeamId(name);
+    return AM_LOCAL_LOGOS.has(id) ? id : (AM_LOGO_ALIAS.find(([re]) => re.test(id)) || [])[1] || '';
+  };
+  const amAscii = (s) => s.replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss'); // Dateinamen ohne Umlaute
+  const amLocalLogo = (name) => { const key = amLogoKey(name); return key ? `logos/kreisliga/${amAscii(key)}.png` : ''; };
   function amApplyLocalLogos(data) {
     const names = new Set(Object.keys(data.logos || {}));
     (data.table || []).forEach((r) => names.add(r.team));
@@ -1110,6 +1141,7 @@
     const side = (name) => ({
       name, favId: amTeamId(name),
       logoHtml: amLogo(logos[name]), logoUrl: amLogoOk(logos[name]) ? logos[name] : '',
+      color: (AM_LOGO_COLORS[amLogoKey(name)] || [])[0], alt: (AM_LOGO_COLORS[amLogoKey(name)] || [])[1],
       score: null, sub: name === own ? 'SGM' : '',
     });
     const key = `${lg.id}:${m.matchNo || amTeamId(`${m.date}-${m.home}-${m.away}`)}`;
