@@ -79,7 +79,7 @@ vom Fussball.de-Logodienst (Hotlink).
 - `api/_fussballde.js` enthält Mannschaftskonfiguration und Parser (`npm test` prüft ihn).
 - **Spiel-Popup** (Karte antippen, `amateurdetail.js` + `api/amateurgame.js`): Spielort mit Kartenlink, Vergleich der Mannschaften
   (Tabellenplatz, Punkte, Torverhältnis, Form, bester Torschütze, Karten) und bei gespielten Spielen der Spielverlauf (Minute, Art, Seite)
-  sowie ein Link zur Spielseite. Es wird nur angezeigt, was auf Fussball.de lesbar im HTML steht; Schiedsrichter, Aufstellungen,
+  sowie ein Link zur Spielseite (der Spielverlauf ist unvollständig: Tore ohne Elfmeter stehen dort nicht lesbar). Es wird nur angezeigt, was auf Fussball.de lesbar im HTML steht; Schiedsrichter, Aufstellungen,
   Spielernamen und Zwischenstände fehlen dort bzw. sind verschleiert. Die Function akzeptiert nur Spielseiten von `www.fussball.de`.
 - **Keine Torstände:** Fussball.de verschleiert Ergebnisse (jede Ziffer ist ein Sonderzeichen einer
   seitenspezifischen Schriftart). Das wird bewusst nicht umgangen; gespielte Spiele verlinken auf den Spielbericht.

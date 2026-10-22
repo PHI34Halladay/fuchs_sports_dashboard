@@ -156,7 +156,7 @@
       const name = e.side === 'home' ? m.home : m.away;
       return `<div class="ad-ev"><span class="gc-time">${esc(e.label)}’</span><span class="hd-tl">${logo(logos[name])}</span><span><span class="ad-ico">${ico}</span> ${esc(label)} <span class="muted">${esc(name)}</span></span></div>`;
     }).join('');
-    return section('Spielverlauf', `${rows}<p class="muted ad-note">Spielernamen und Zwischenstände zeigt Fussball.de nicht lesbar an.</p>`);
+    return section('Spielverlauf', `${rows}<p class="muted ad-note">Fussball.de zeigt Spielernamen, Zwischenstände und einen Teil der Ereignisse (z. B. Tore) nicht lesbar an – die Liste ist deshalb unvollständig.</p>`);
   }
 
   function render() {
