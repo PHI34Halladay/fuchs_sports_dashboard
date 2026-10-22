@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '2.9.7';
+  const VERSION = '2.9.8';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -265,6 +265,25 @@
     const parts = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d);
     const get = (t) => parts.find((p) => p.type === t).value;
     return `${get('year')}${get('month')}${get('day')}`;
+  }
+  // Datum 'YYYY-MM-DD' + Uhrzeit 'HH:MM' in deutscher Zeit → Zeitstempel (ms), berücksichtigt Sommer-/Winterzeit
+  function berlinMs(date, time) {
+    const d = /^(\d{4})-(\d{2})-(\d{2})/.exec(date || ''), t = /(\d{1,2})[:.](\d{2})/.exec(time || '');
+    if (!d || !t) return null;
+    const guess = Date.UTC(+d[1], +d[2] - 1, +d[3], +t[1], +t[2]);
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Berlin', hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' }).formatToParts(new Date(guess));
+    const g = (k) => +parts.find((p) => p.type === k).value;
+    const offset = Date.UTC(g('year'), g('month') - 1, g('day'), g('hour'), g('minute')) - guess;
+    return guess - offset;
+  }
+  // Countdown „1 Tag 23 Stunden 4 Minuten 15 Sekunden“ – Einheiten mit 0 werden ausgeblendet
+  function fmtCountdown(ms) {
+    let s = Math.max(0, Math.floor(ms / 1000));
+    const units = [[86400, 'Tag', 'Tage'], [3600, 'Stunde', 'Stunden'], [60, 'Minute', 'Minuten'], [1, 'Sekunde', 'Sekunden']];
+    return units.map(([n, one, many]) => {
+      const v = Math.floor(s / n); s -= v * n;
+      return v ? `${v} ${v === 1 ? one : many}` : '';
+    }).filter(Boolean).join(' ');
   }
   const ymdToDate = (s) => new Date(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8), 12);
   const fmtTime = new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' });
@@ -535,6 +554,7 @@
     if (m.pin) pinSnapshots.set(m.pin.key, m.pin);
     const clickable = !!m.eventId;
     const lg = leagueById(m.lgId);
+    const cdLeft = m.state === 'pre' && m.start ? m.start - Date.now() : 0;
 
     const team = (t, side) => `
       <div class="mc-team ${side}${t.dim ? ' dim' : ''}">
@@ -556,6 +576,7 @@
         style="${style}"${lc} data-league-id="${esc(m.lgId)}"${clickable ? ` data-event="${esc(m.eventId)}" data-link="${esc(m.link || '')}" tabindex="0" role="button" aria-label="${esc(`${m.home.name} gegen ${m.away.name} – Details öffnen`)}"` : ''}>
         <div class="mc-top">
           <span class="mc-tag">${m.showLeague && lg ? `<b style="--lg:${lg.color}">${esc(lg.name)}</b>` : ''}${m.note ? `<span>${esc(m.note)}</span>` : ''}</span>
+          ${cdLeft >= 1000 ? `<span class="mc-cd" data-start="${m.start}" title="Zeit bis Spielbeginn">${fmtCountdown(cdLeft)}</span>` : ''}
           ${m.pin ? `<button class="mc-pin${pinned ? ' on' : ''}" data-pin="${esc(m.pin.key)}" title="${pinned ? 'Nicht mehr merken' : 'Spiel merken'}" aria-pressed="${!!pinned}" aria-label="Spiel merken">${BOOKMARK}</button>` : ''}
         </div>
         <div class="mc-main">
@@ -604,12 +625,13 @@
         dim: stateName === 'post' && anyWinner && c.winner === false,
       };
     };
-    let statusHtml, mid = '';
+    let statusHtml, mid = '', start = null;
     if (stateName === 'in') statusHtml = `<span class="live-badge">${esc(st.shortDetail || 'Live')}</span>`;
     else if (stateName === 'post') statusHtml = `<span class="mc-final">${esc(translateStatus(st))}</span>`;
     else {
       const timeOpen = ev.timeValid === false || comp.timeValid === false;
       mid = timeOpen ? 'offen' : fmtTime.format(new Date(ev.date));
+      if (!timeOpen && !['STATUS_POSTPONED', 'STATUS_CANCELED'].includes(st.name)) start = Date.parse(ev.date) || null;
       statusHtml = `<span>${timeOpen ? 'Zeit noch offen' : (showLeague ? fmtChip.format(new Date(ev.date)) : 'Uhr')}</span>`;
       if (['STATUS_POSTPONED', 'STATUS_CANCELED'].includes(st.name)) statusHtml = `<span class="mc-final">${esc(translateStatus(st))}</span>`;
     }
@@ -620,7 +642,7 @@
     const key = `${lg.id}:${ev.id}`;
     return {
       lgId: lg.id, eventId: ev.id, link, linkLabel: 'ESPN',
-      state: stateName, mid, statusHtml,
+      state: stateName, mid, statusHtml, start,
       note: comp.notes?.[0]?.headline || comp.series?.summary || '',
       home, away,
       extra: stateName !== 'pre' ? leadersHtml(comp) : '',
@@ -1151,6 +1173,7 @@
     return {
       lgId: lg.id, eventId, state: m.played ? 'post' : 'pre',
       mid: m.played ? '✓' : (m.time || 'offen'),
+      start: m.played ? null : berlinMs(m.date, m.time),
       statusHtml: m.played ? '<span class="mc-final">Beendet</span>' : `<span>${m.time ? 'Uhr' : 'Zeit offen'}</span>`,
       note: m.note || '',
       home: side(m.home), away: side(m.away),
@@ -1320,6 +1343,7 @@
       eventId: detail ? g.id : undefined,
       lgId: lg.id, state: g.played ? 'post' : g.live ? 'in' : 'pre',
       mid: g.time || 'offen',
+      start: g.played || g.live ? null : berlinMs(g.date, g.time),
       statusHtml: g.played ? `<span class="mc-final">${g.ot === 'PSO' ? 'Ende n.P.' : g.ot === 'OT' ? 'Ende n.V.' : 'Ende'}</span>` : g.live ? `<span class="live-badge">${esc(g.status || 'Live')}</span>` : `<span>${g.time ? 'Uhr' : 'Zeit offen'}</span>`,
       home: side(g.home, g.played && g.home.score < g.away.score),
       away: side(g.away, g.played && g.away.score < g.home.score),
@@ -2056,6 +2080,19 @@
   loadLeagueLogos();
   pollLive();
   document.addEventListener('visibilitychange', () => { if (!document.hidden) pollLive(); });
+
+  // Countdowns bis Spielbeginn jede Sekunde aktualisieren; bei 0 verschwindet der Countdown
+  function tickCountdowns() {
+    if (document.hidden) return;
+    const now = Date.now();
+    document.querySelectorAll('.mc-cd[data-start]').forEach((c) => {
+      const left = +c.dataset.start - now;
+      if (left < 1000) { c.remove(); return; }
+      const txt = fmtCountdown(left);
+      if (c.textContent !== txt) c.textContent = txt;
+    });
+  }
+  setInterval(tickCountdowns, 1000);
   if (initialLeague.hockey || initialLeague.amateur) {
     renderTabs(); renderDate(); skeleton();
     (initialLeague.hockey ? snapHockey(initialLeague) : snapAmateur(initialLeague)).then(() => { if (currentLeague()?.id === initialLeague.id) load(); });

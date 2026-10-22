@@ -229,7 +229,15 @@ kbd { font-family: var(--font); font-size: 11px; padding: 1px 6px; border-radius
 .mc.live { border-color: color-mix(in srgb, var(--live) 75%, transparent); animation: liveGlow 2.4s ease-in-out infinite; }
 @keyframes liveGlow { 50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--live) 50%, transparent), 0 0 26px color-mix(in srgb, var(--live) 28%, transparent); } }
 
-.mc-top { display: flex; justify-content: space-between; align-items: center; min-height: 22px; gap: 8px; }
+.mc-top { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; min-height: 22px; gap: 8px; }
+.mc-top > .mc-tag { grid-column: 1; }
+.mc-top > .mc-pin { grid-column: 3; justify-self: end; }
+.mc-cd {
+  grid-column: 2; padding: 2px 9px; border-radius: 999px;
+  background: rgba(0, 0, 0, .38); color: #fff;
+  font-size: 11px; font-weight: 600; letter-spacing: .2px; font-variant-numeric: tabular-nums;
+  white-space: nowrap; pointer-events: none;
+}
 .mc-tag { display: flex; gap: 8px; align-items: center; font-size: 11px; color: rgba(255, 255, 255, .72); text-transform: uppercase; letter-spacing: .5px; font-weight: 600; min-width: 0; }
 .mc-tag span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mc-tag b { --lg: #888; padding: 1px 7px; border-radius: 999px; background: color-mix(in srgb, var(--lg) 70%, #000); color: #fff; font-weight: 700; white-space: nowrap; }
