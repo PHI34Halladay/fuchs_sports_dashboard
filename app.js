@@ -4,10 +4,11 @@
 (() => {
   'use strict';
 
-  const VERSION = '2.9.9';
+  const VERSION = '3.0.0';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
+  const TODAY_ID = 'today'; // „Heute“-Ansicht: alles, was heute live läuft (alle Sportarten)
 
   // Sportarten = obere Navigationsebene; jede Liga gehört genau zu einer (cat).
   const SPORTS = [
@@ -58,6 +59,8 @@
   ];
   // Virtuelle Ligen „Live“ je Sportart: alle laufenden Spiele dieser Sportart (erscheint vorne in der Ligaleiste)
   SPORTS.filter((sp) => sp.id !== 'fav').forEach((sp) => LEAGUES.push({ id: `live-${sp.id}`, name: 'Live', cat: sp.id, isLive: true, color: '#ff4757' }));
+  // Virtuelle Liga „Heute“: alle laufenden Spiele aller Sportarten; Sportarten- und Ligaleiste sind dort ausgeblendet
+  LEAGUES.push({ id: TODAY_ID, name: 'Heute', cat: 'today', isLive: true, isToday: true, color: '#ff4757' });
   const DEFAULT_LEAGUE = { fav: FAV_ID, soccer: 'bl1', football: 'nfl', basketball: 'nba', hockey: 'nhl', baseball: 'mlb' };
   const AMATEUR_LABEL = { sgm1: 'SGM I', sgm2: 'SGM II' };
 
@@ -85,10 +88,12 @@
   const saved = readJSON(LS_STATE, {});
   // Alte Einzel-Ligen SGM I / SGM II sind jetzt gemeinsam die "Kreisliga"
   if (saved.leagueId === 'sgm1' || saved.leagueId === 'sgm2') saved.leagueId = 'kreis';
+  if (saved.leagueId === TODAY_ID) saved.leagueId = 'bl1'; // „Heute“ wird nie als Startansicht gemerkt
   const initialLeagueId = LEAGUES.some((l) => l.id === saved.leagueId) ? saved.leagueId : 'bl1';
   const initialLeague = LEAGUES.find((l) => l.id === initialLeagueId);
   const state = {
     leagueId: initialLeagueId,
+    prevLeagueId: initialLeagueId, // Liga, zu der „Zurück“ aus der Heute-Ansicht führt
     tab: initialLeagueId === FAV_ID ? 'scores' : (['scores', 'standings', 'news'].includes(saved.tab) && !(noNewsTab(initialLeague) && saved.tab === 'news') ? saved.tab : 'scores'),
     date: defaultAnchor(initialLeague),
     top25Only: !!saved.top25Only,
@@ -141,8 +146,10 @@
   const el = {
     sports: $('sports'), leaguebar: $('leaguebar'), tabs: $('tabs'), content: $('content'), status: $('status'),
     heroLogo: $('heroLogo'), heroName: $('heroName'), heroKicker: $('heroKicker'),
-    scoreControls: $('scoreControls'), dateText: $('dateText'), dateInput: $('dateInput'),
+    scoreControls: $('scoreControls'), dateText: $('dateText'), dateBtn: $('dateBtn'),
     prevDay: $('prevDay'), nextDay: $('nextDay'), todayBtn: $('todayBtn'),
+    todayNavBtn: $('todayNavBtn'), todayCount: $('todayCount'), todayBack: $('todayBack'),
+    calDlg: $('calDlg'), calBody: $('calBody'),
     top25Toggle: $('top25Toggle'), top25Only: $('top25Only'), updated: $('updated'), version: $('version'), source: $('source'),
     autoReload: $('autoReload'),
     searchBtn: $('searchBtn'), search: $('search'), searchInput: $('searchInput'), searchResults: $('searchResults'), searchClose: $('searchClose'),
@@ -157,7 +164,7 @@
     try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* egal */ }
   }
   function persist() {
-    writeJSON(LS_STATE, { leagueId: state.leagueId, tab: state.tab, top25Only: state.top25Only, autoReload: state.autoReload, kreisTeam: state.kreisTeam });
+    writeJSON(LS_STATE, { leagueId: state.leagueId === TODAY_ID ? state.prevLeagueId : state.leagueId, tab: state.tab, top25Only: state.top25Only, autoReload: state.autoReload, kreisTeam: state.kreisTeam });
   }
   function esc(s) {
     return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -349,12 +356,15 @@
     const weekKey = `${lg.id}:week:${group.value}:${entry.value}`;
     let days = gameDayCache.get(weekKey);
     if (!days) {
-      try {
-        const params = { seasontype: group.value, week: entry.value };
-        if (lg.groups) params.groups = lg.groups;
-        const data = await api('scoreboard', params, lg);
-        days = new Set((data?.events || []).map((ev) => ymdInTZ(new Date(ev.date), tz)));
-      } catch { days = new Set(); }
+      // Promise zwischenspeichern: der Kalender fragt mehrere Tage derselben Woche parallel ab
+      days = (async () => {
+        try {
+          const params = { seasontype: group.value, week: entry.value };
+          if (lg.groups) params.groups = lg.groups;
+          const data = await api('scoreboard', params, lg);
+          return new Set((data?.events || []).map((ev) => ymdInTZ(new Date(ev.date), tz)));
+        } catch { return new Set(); }
+      })();
       gameDayCache.set(weekKey, days);
     }
     return days;
@@ -435,7 +445,7 @@
       const spec = LEAGUES.filter(isEspn).map((lg) => `${lg.id}:${ymdInTZ(defaultAnchor(lg), leagueTZ(lg))}`).join(',');
       try {
         const res = await fetch(`/api/live?l=${encodeURIComponent(spec)}`);
-        if (res.ok) { liveCounts = (await res.json()).live || {}; renderSports(); renderLeaguebar(); }
+        if (res.ok) { liveCounts = (await res.json()).live || {}; renderSports(); renderLeaguebar(); renderTodayBtn(); }
       } catch { /* nächster Versuch */ }
     }
     liveTimer = setTimeout(pollLive, 60_000);
@@ -455,8 +465,22 @@
   }
 
   // ---------- Navigation ----------
+  // „Heute“-Knopf oben: aktiv in der Heute-Ansicht, rot pulsierend + Zähler, solange irgendwo etwas live läuft
+  let todayTotal = null; // Anzahl live-Spiele aus der Heute-Ansicht (enthält auch Hockeyweb), sonst null
+  function renderTodayBtn() {
+    const on = currentLeague().isToday;
+    const n = on && todayTotal != null ? todayTotal : Object.values(liveCounts).reduce((s, v) => s + (+v || 0), 0);
+    el.todayNavBtn.classList.toggle('active', !!on);
+    el.todayNavBtn.classList.toggle('has-live', n > 0);
+    el.todayNavBtn.setAttribute('aria-pressed', !!on);
+    el.todayCount.hidden = !n;
+    el.todayCount.textContent = n || '';
+    el.todayNavBtn.title = on ? 'Zurück zur vorherigen Ansicht' : n ? `${n} Spiel${n === 1 ? '' : 'e'} live – alle Sportarten` : 'Alles, was heute live läuft – alle Sportarten';
+  }
+
   function renderSports() {
     const cat = currentLeague().cat;
+    el.sports.hidden = !!currentLeague().isToday;
     el.sports.innerHTML = SPORTS.map((s) => {
       const badge = s.id === 'fav' && pins.length ? `<span class="sport-badge">${pins.length}</span>` : '';
       const live = s.id === 'fav' ? 0 : liveIn((l) => l.cat === s.id);
@@ -471,6 +495,8 @@
 
   function renderLeaguebar() {
     const lg = currentLeague();
+    el.leaguebar.hidden = !!lg.isToday;
+    if (lg.isToday) { el.leaguebar.innerHTML = ''; return; }
     if (lg.isFav) {
       const teams = favorites.size, pinned = pins.length;
       el.leaguebar.innerHTML = `<div class="lg-info"><span>★ ${teams} Team${teams === 1 ? '' : 's'}</span><span>🔖 ${pinned} gemerkte${pinned === 1 ? 's' : ''} Spiel${pinned === 1 ? '' : 'e'}</span><span class="muted">Tipp: ★ markiert Teams, 🔖 merkt einzelne Spiele</span></div>`;
@@ -498,8 +524,9 @@
     const hl = lg.isFav ? '' : leagueLogoUrl(lg) || meta?.logo;
     el.heroLogo.innerHTML = hl ? `<img src="${esc(hl)}" alt="">` : lg.abbr ? `<b class="hero-abbr">${esc(lg.abbr)}</b>` : `<span>${sport?.icon || '★'}</span>`;
     if (lg.isLive) el.heroLogo.innerHTML = '<span class="hero-live" aria-hidden="true"></span>';
-    el.heroName.textContent = lg.isFav ? 'Meine Favoriten' : lg.isLive ? `Live · ${sport?.label || ''}` : lg.name;
+    el.heroName.textContent = lg.isFav ? 'Meine Favoriten' : lg.isToday ? 'Heute live' : lg.isLive ? `Live · ${sport?.label || ''}` : lg.name;
     const kick = lg.isFav ? 'Teams & gemerkte Spiele aus allen Ligen'
+      : lg.isToday ? 'Alle laufenden Spiele · alle Sportarten und Ligen'
       : lg.isLive ? 'Alle laufenden Spiele · nach Liga und Beginn'
       : lg.amateur ? 'Fußball · SGM Gündelbach/Häfnerhaslach'
         : [sport?.label, meta?.season].filter(Boolean).join(' · ');
@@ -519,7 +546,11 @@
     });
     el.tabs.style.display = isFavView ? 'none' : '';
     el.scoreControls.style.display = state.tab === 'scores' && !lg.isLive ? '' : 'none';
-    el.source.textContent = lg.amateur
+    el.todayBack.hidden = !lg.isToday;
+    if (lg.isToday) el.todayBack.textContent = `‹ Zurück zu ${leagueById(state.prevLeagueId)?.name || 'Ligen'}`;
+    el.source.textContent = lg.isToday
+      ? 'Daten: ESPN & Hockeyweb · Zeiten in deiner Ortszeit · Kreisliga hat keine Live-Daten'
+      : lg.amateur
       ? 'Daten: Fussball.de (ausgelesen, ohne Torstände) · Zeiten laut Spielplan'
       : lg.hockey
         ? 'Daten: Hockeyweb (App-Schnittstelle) · Zeiten in deutscher Zeit'
@@ -529,13 +560,13 @@
   function renderDate() {
     const rel = relDay(state.date);
     el.dateText.textContent = rel ? `${rel} · ${fmtChip.format(state.date)}` : fmtShort.format(state.date);
-    el.dateInput.value = toISODate(state.date);
     el.todayBtn.hidden = ymdOf(state.date) === ymdOf(defaultAnchor(currentLeague()));
   }
   function renderChrome() {
     renderSports();
     renderLeaguebar();
     renderHero();
+    renderTodayBtn();
   }
 
   // ---------- Spielkarte (einheitlich für ESPN, Fussball.de, Hockeyweb) ----------
@@ -1469,10 +1500,14 @@
     const id = ++requestId;
     clearTimeout(refreshTimer);
     if (!silent) { skeleton(4); showStatus(''); }
-    const cat = currentLeague().cat;
+    const cur = currentLeague();
+    const cat = cur.cat;
+    // „Heute“-Ansicht: alle Sportarten; sonst nur die der gewählten Sportart
+    const inScope = (l) => cur.isToday || l.cat === cat;
+    if (cur.isToday && !silent) todayTotal = null;
     const known = Object.keys(liveCounts).length > 0;
-    const espn = LEAGUES.filter((l) => l.cat === cat && isEspn(l) && (!known || +liveCounts[l.id] > 0));
-    const hock = LEAGUES.filter((l) => l.cat === cat && l.hockey);
+    const espn = LEAGUES.filter((l) => inScope(l) && isEspn(l) && (!known || +liveCounts[l.id] > 0));
+    const hock = LEAGUES.filter((l) => inScope(l) && l.hockey);
     const groups = [];
     await Promise.all([
       ...espn.map(async (lg) => {
@@ -1495,15 +1530,136 @@
     ]);
     if (id !== requestId) return;
     groups.sort((a, b) => LEAGUES.indexOf(a.lg) - LEAGUES.indexOf(b.lg));
+    // Heute-Ansicht: Liga-Überschrift mit Sportart-Symbol, damit klar ist, zu welcher Sportart die Liga gehört
+    const sportIcon = (lg) => (cur.isToday ? `<span class="live-sport" aria-hidden="true">${SPORTS.find((s) => s.id === lg.cat)?.icon || ''}</span>` : '');
     el.content.innerHTML = groups.length
-      ? groups.map((g) => `<h2 class="group-title"><span class="live-group">${leagueBadge(g.lg)}${esc(g.lg.name)}</span><span class="group-count"><b class="live-text">${g.cards.length} live</b></span></h2><div class="games">${g.cards.join('')}</div>`).join('')
-      : '<div class="empty"><div class="empty-icon">📺</div>Gerade läuft in dieser Sportart kein Spiel.</div>';
+      ? groups.map((g) => `<h2 class="group-title"><span class="live-group">${sportIcon(g.lg)}${leagueBadge(g.lg)}${esc(g.lg.name)}</span><span class="group-count"><b class="live-text">${g.cards.length} live</b></span></h2><div class="games">${g.cards.join('')}</div>`).join('')
+      : `<div class="empty"><div class="empty-icon">📺</div>${cur.isToday ? 'Gerade läuft kein Spiel live.<br><span class="muted">Die Ansicht aktualisiert sich automatisch.</span>' : 'Gerade läuft in dieser Sportart kein Spiel.'}</div>`;
+    if (cur.isToday) todayTotal = groups.reduce((n, g) => n + g.cards.length, 0);
     paintCards();
     setUpdated();
     renderSports();
     renderLeaguebar();
+    renderTodayBtn();
     refreshTimer = setTimeout(() => { if (!document.hidden && currentLeague().isLive) loadLive({ silent: true }); }, REFRESH_LIVE_MS);
   }
+
+  // ---------- Kalender in der App (statt der Datumsauswahl von Android/Browser) ----------
+  // Monatsraster mit Markierung der Tage, an denen in der gewählten Liga Spiele sind. Die Spieltage
+  // kommen aus denselben Quellen wie die Tagesnavigation (‹ ›): ESPN-Kalender, Hockeyweb-Spielwochen,
+  // Fussball.de-Spielplan; in der Favoriten-Ansicht sind es die gemerkten Spiele (🔖).
+  const calState = { year: 0, month: 0, marks: null, token: 0 }; // marks: Set<YYYYMMDD> | null = lädt | false = nicht verfügbar
+  const calCache = new Map(); // "liga:von:bis" → { t, marks }
+  const CAL_TTL_MS = 5 * 60_000;
+  const fmtMonth = new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' });
+  const fmtDayLong = new Intl.DateTimeFormat('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const calGridStart = () => {
+    const first = new Date(calState.year, calState.month, 1, 12);
+    return new Date(calState.year, calState.month, 1 - ((first.getDay() + 6) % 7), 12); // Wochenbeginn Montag
+  };
+  const calGridEnd = () => { const s = calGridStart(); return new Date(s.getFullYear(), s.getMonth(), s.getDate() + 41, 12); };
+
+  async function calendarMarks(lg, from, to) {
+    if (lg.isFav) return new Set(pins.map((p) => p.day));
+    if (lg.amateur) return new Set((await amateurGameDays(lg)).map((d) => d.replace(/-/g, '')));
+    if (lg.hockey) {
+      const fromIso = toISODate(from), toIso = toISODate(to);
+      const probe = await hockeyGames(lg, toISODate(todayAnchor()));
+      const weeks = (probe.calendar || []).filter((w) => w.to >= fromIso && w.from <= toIso);
+      // ohne lesbaren Kalender: wenigstens die geladene Woche markieren
+      const pages = weeks.length ? await Promise.all(weeks.map((w) => hockeyGames(lg, w.from).catch(() => ({ days: [] })))) : [probe];
+      return new Set(pages.flatMap((p) => p.days || []).filter((d) => d >= fromIso && d <= toIso).map((d) => d.replace(/-/g, '')));
+    }
+    if (isEspn(lg)) {
+      // alle 3 Tage eine Abfrage reicht, um jede Woche (NFL/NCAAF) einmal zu treffen; bei Tageslisten ist es ohnehin dieselbe Menge
+      const dates = [];
+      for (let d = new Date(from); d <= to; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 3, 12)) dates.push(d);
+      const first = await gameDaySet(lg, dates[0]); // lädt den Saisonkalender einmal, der Rest kommt aus dem Cache
+      const sets = [first, ...(await Promise.all(dates.slice(1).map((d) => gameDaySet(lg, d))))];
+      if (sets.every((s) => !s)) return null;
+      return new Set(sets.flatMap((s) => (s ? [...s] : [])));
+    }
+    return null;
+  }
+
+  async function loadCalMarks() {
+    const lg = currentLeague();
+    const from = calGridStart(), to = calGridEnd();
+    const key = `${lg.id}:${ymdOf(from)}:${ymdOf(to)}`;
+    const hit = calCache.get(key);
+    const token = ++calState.token;
+    if (hit && !lg.isFav && Date.now() - hit.t < CAL_TTL_MS) { calState.marks = hit.marks; renderCalendar(); return; }
+    calState.marks = null;
+    renderCalendar();
+    let marks;
+    try { marks = await calendarMarks(lg, from, to); } catch { marks = null; }
+    if (token !== calState.token) return; // inzwischen anderer Monat/geschlossen
+    calState.marks = marks || false;
+    if (marks) calCache.set(key, { t: Date.now(), marks });
+    renderCalendar();
+  }
+
+  function renderCalendar() {
+    const lg = currentLeague();
+    const start = calGridStart();
+    const today = ymdOf(todayAnchor()), sel = ymdOf(state.date);
+    const marks = calState.marks;
+    const days = Array.from({ length: 42 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i, 12));
+    const cells = days.map((d) => {
+      const y = ymdOf(d);
+      const game = marks instanceof Set && marks.has(y);
+      const cls = ['cal-day', d.getMonth() !== calState.month ? 'out' : '', y === today ? 'today' : '', y === sel ? 'sel' : '', game ? 'game' : ''].filter(Boolean).join(' ');
+      return `<button type="button" class="${cls}" data-ymd="${y}" aria-label="${esc(fmtDayLong.format(d))}${game ? ', Spieltag' : ''}"${y === sel ? ' aria-current="date"' : ''}>${d.getDate()}</button>`;
+    }).join('');
+    const what = lg.isFav ? 'Gemerktes Spiel' : 'Spieltag';
+    const note = marks === null ? 'Spieltage werden geladen …'
+      : marks === false ? 'Spieltage derzeit nicht verfügbar'
+        : `<span class="cal-leg"><i></i>${what}${lg.isFav ? '' : ` · ${esc(lg.name)}`}</span>`;
+    el.calBody.innerHTML = `
+      <div class="cal-head">
+        <button type="button" class="cal-nav" data-cal="prev" aria-label="Vorheriger Monat">‹</button>
+        <div class="cal-title">${esc(fmtMonth.format(new Date(calState.year, calState.month, 1)))}</div>
+        <button type="button" class="cal-nav" data-cal="next" aria-label="Nächster Monat">›</button>
+        <button type="button" class="cal-x" data-cal="close" aria-label="Schließen">×</button>
+      </div>
+      <div class="cal-wd">${['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((w) => `<span>${w}</span>`).join('')}</div>
+      <div class="cal-grid">${cells}</div>
+      <div class="cal-foot"><span>${note}</span><button type="button" class="cal-now" data-cal="now">Aktuell</button></div>`;
+  }
+
+  function openCalendar() {
+    calState.year = state.date.getFullYear();
+    calState.month = state.date.getMonth();
+    document.body.classList.add('modal-open');
+    if (!el.calDlg.open) el.calDlg.showModal();
+    loadCalMarks();
+  }
+  function closeCalendar() {
+    calState.token++;
+    if (el.calDlg.open) el.calDlg.close();
+  }
+  el.dateBtn.addEventListener('click', openCalendar);
+  el.calDlg.addEventListener('close', () => { calState.token++; document.body.classList.remove('modal-open'); });
+  el.calDlg.addEventListener('click', (e) => {
+    if (e.target === el.calDlg) { closeCalendar(); return; } // Klick auf den abgedunkelten Hintergrund
+    const nav = e.target.closest('[data-cal]');
+    if (nav) {
+      const act = nav.dataset.cal;
+      if (act === 'close') closeCalendar();
+      else if (act === 'now') { closeCalendar(); goCurrent(); }
+      else {
+        const d = new Date(calState.year, calState.month + (act === 'next' ? 1 : -1), 1);
+        calState.year = d.getFullYear(); calState.month = d.getMonth();
+        loadCalMarks();
+      }
+      return;
+    }
+    const day = e.target.closest('[data-ymd]');
+    if (!day) return;
+    state.date = ymdToDate(day.dataset.ymd);
+    closeCalendar();
+    load();
+  });
 
   // ---------- Steuerung ----------
   function load() {
@@ -1627,19 +1783,24 @@
 
   el.prevDay.addEventListener('click', () => shiftDay(-1));
   el.nextDay.addEventListener('click', () => shiftDay(1));
-  el.todayBtn.addEventListener('click', () => {
+  function goCurrent() {
     const lg = currentLeague();
     state.date = defaultAnchor(lg);
     if (lg.hockey) { skeleton(); snapHockey(lg).then(load); return; }
     if (lg.amateur) { skeleton(); snapAmateur(lg).then(load); return; }
     load();
+  }
+  el.todayBtn.addEventListener('click', goCurrent);
+
+  // „Heute“ ganz oben: zeigt alles, was heute live läuft (alle Sportarten, nicht laufende Ligen ausgeblendet).
+  // Nochmal tippen oder „Zurück“ führt zur vorherigen Liga.
+  function leaveToday() { selectLeague(leagueById(state.prevLeagueId) ? state.prevLeagueId : 'bl1'); }
+  el.todayNavBtn.addEventListener('click', () => {
+    if (state.leagueId === TODAY_ID) { leaveToday(); return; }
+    state.prevLeagueId = state.leagueId;
+    selectLeague(TODAY_ID);
   });
-  el.dateInput.addEventListener('change', () => {
-    if (!el.dateInput.value) return;
-    const [y, m, d] = el.dateInput.value.split('-').map(Number);
-    state.date = new Date(y, m - 1, d, 12);
-    load();
-  });
+  el.todayBack.addEventListener('click', leaveToday);
   el.top25Only.checked = state.top25Only;
   el.top25Only.addEventListener('change', () => {
     state.top25Only = el.top25Only.checked;

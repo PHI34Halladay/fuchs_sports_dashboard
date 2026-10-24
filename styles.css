@@ -54,7 +54,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .brand-name { font-family: var(--display); font-size: 22px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; }
 .brand-name b { font-weight: 800; margin-left: 3px; color: var(--accent); transition: color .3s; }
 
-.topbar-row .brand { margin-right: auto; }
+/* Marke links, „Heute“-Knopf exakt in der Mitte, Suche + Sync rechts */
+.topbar-row .brand { flex: 1 1 0; min-width: 0; }
+.brand-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topbar-tools { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
 /* Sportarten: eigene Reihe über der Ligaleiste */
 .sports {
   display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
@@ -155,13 +158,13 @@ kbd { font-family: var(--font); font-size: 11px; padding: 1px 6px; border-radius
 .icon-btn { width: 34px; height: 32px; border-radius: 9px; background: transparent; border: 0; font-size: 20px; line-height: 1; color: var(--text); }
 .icon-btn:hover { background: rgba(255, 255, 255, .08); }
 .date-label {
-  position: relative; height: 32px; min-width: 150px; padding: 0 12px;
+  position: relative; height: 32px; min-width: 150px; padding: 0 12px; gap: 8px;
   display: flex; align-items: center; justify-content: center;
+  background: transparent; border: 0; color: var(--text);
   font-weight: 600; font-size: 14px; cursor: pointer; border-radius: 9px;
 }
 .date-label:hover { background: rgba(255, 255, 255, .06); }
-.date-label input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
-.date-label input::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; }
+.date-ico { flex-shrink: 0; color: var(--muted); }
 .today-btn { height: 38px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--border); background: rgba(0, 0, 0, .35); font-size: 13px; font-weight: 600; }
 .today-btn:hover { border-color: var(--accent); }
 .today-btn[hidden] { display: none; }
@@ -394,7 +397,8 @@ dialog.search::backdrop { background: rgba(0, 0, 0, .6); backdrop-filter: blur(4
   .search-trigger-text, .search-trigger kbd { display: none; }
 }
 @media (max-width: 640px) {
-  .topbar-row { padding: 8px 12px; }
+  .topbar-row { padding: 8px 12px; gap: 8px; }
+  .topbar-tools { gap: 8px; }
   .brand-name { font-size: 20px; }
   .brand { flex: 1; }
   /* Sportarten oben als scrollbare Reihe */
@@ -1005,3 +1009,64 @@ dialog.reader .gc-shell > .gc-scroll { padding-top: 0; }
 .ad-news span:last-child { color: var(--accent); font-weight: 600; }
 .ad-back { background: none; border: 0; color: var(--accent); font: inherit; font-weight: 700; padding: 6px 0 12px; cursor: pointer; }
 .ad .rd p { line-height: 1.55; margin: 0 0 12px; }
+
+/* ---------- „Heute“-Knopf (alles, was heute live läuft) ---------- */
+.sports[hidden], .leaguebar[hidden] { display: none; }
+.live-today-btn {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  height: 36px; padding: 0 14px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--border-strong); color: var(--text);
+  font-size: 14px; font-weight: 700; letter-spacing: .2px; transition: background .15s, border-color .15s;
+}
+.live-today-btn:hover { border-color: var(--live); }
+.lt-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+.live-today-btn.has-live { border-color: color-mix(in srgb, var(--live) 70%, transparent); }
+.live-today-btn.has-live .lt-dot { background: var(--live); box-shadow: 0 0 8px var(--live); animation: pulse 1.2s infinite; }
+.lt-count {
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; font-size: 10.5px; font-weight: 800;
+  background: var(--live); color: #fff; display: inline-flex; align-items: center; justify-content: center;
+}
+.lt-count[hidden] { display: none; }
+.live-today-btn.active { background: var(--live); border-color: var(--live); color: #fff; box-shadow: 0 2px 14px color-mix(in srgb, var(--live) 50%, transparent); }
+.live-today-btn.active .lt-dot { background: #fff; box-shadow: none; }
+.live-today-btn.active .lt-count { background: #fff; color: var(--live); }
+@media (max-width: 640px) { .live-today-btn { height: 38px; padding: 0 12px; } }
+/* Sehr schmal: nur das Logo der Marke, damit der Knopf mittig bleibt */
+@media (max-width: 520px) { .brand-name { display: none; } }
+
+/* ---------- Kalender in der App ---------- */
+dialog.caldlg {
+  padding: 0; border: 1px solid var(--border-strong); border-radius: 20px; background: var(--bg); color: var(--text);
+  width: min(380px, calc(100vw - 24px)); box-shadow: 0 30px 90px rgba(0, 0, 0, .6);
+}
+dialog.caldlg::backdrop { background: rgba(0, 0, 0, .7); backdrop-filter: blur(4px); }
+.cal-body { padding: 14px 14px 16px; }
+.cal-head { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+.cal-title { flex: 1; text-align: center; font-family: var(--display); font-size: 22px; font-weight: 800; letter-spacing: .3px; text-transform: uppercase; }
+.cal-nav, .cal-x {
+  width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--border-strong); background: var(--surface-2);
+  font-size: 22px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.cal-nav:hover, .cal-x:hover { border-color: var(--accent); }
+.cal-x { background: rgba(0, 0, 0, .45); }
+.cal-wd, .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.cal-wd span { text-align: center; font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); padding: 4px 0 6px; }
+.cal-day {
+  position: relative; height: 44px; border-radius: 12px; border: 0; background: transparent; color: var(--text);
+  font-size: 15px; font-weight: 600; display: flex; align-items: center; justify-content: center; padding: 0 0 6px;
+}
+.cal-day:hover { background: rgba(255, 255, 255, .08); }
+.cal-day.out { opacity: .35; }
+.cal-day.today { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.cal-day.game::after {
+  content: ''; position: absolute; left: 50%; bottom: 6px; width: 6px; height: 6px; margin-left: -3px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+.cal-day.sel { background: var(--accent); color: #fff; }
+.cal-day.sel.game::after { background: #fff; box-shadow: none; }
+.cal-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; font-size: 12px; color: var(--muted); }
+.cal-leg { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+.cal-leg i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.cal-now { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface-2); font-size: 13px; font-weight: 700; color: var(--text); flex-shrink: 0; }
+.cal-now:hover { border-color: var(--accent); }
+.live-sport { font-size: 18px; line-height: 1; }
