@@ -1069,4 +1069,4 @@ dialog.caldlg::backdrop { background: rgba(0, 0, 0, .7); backdrop-filter: blur(4
 .cal-leg i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
 .cal-now { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface-2); font-size: 13px; font-weight: 700; color: var(--text); flex-shrink: 0; }
 .cal-now:hover { border-color: var(--accent); }
-.live-sport { font-size: 18px; line-height: 1; }
+.live-today-btn.busy { opacity: .7; animation: pulse 1s infinite; }
