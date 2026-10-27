@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '3.0.2';
+  const VERSION = '3.0.3';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -48,7 +48,7 @@
     { id: 'del2', abbr: 'DEL2', name: 'DEL2', cat: 'hockey', group: 'Deutschland', hockey: 'del2', color: '#22b8e8', logo: 'logos/hockey/del2.png' },
     { id: 'obs', abbr: 'OL S', name: 'Oberliga Süd', cat: 'hockey', group: 'Deutschland', hockey: 'obs', color: '#7ea6ff', logo: 'logos/hockey/obs.png' },
     { id: 'obn', abbr: 'OL N', name: 'Oberliga Nord', cat: 'hockey', group: 'Deutschland', hockey: 'obn', color: '#7ea6ff', logo: 'logos/hockey/obn.png' },
-    { id: 'nl', abbr: 'NL', name: 'NL (Schweiz)', cat: 'hockey', group: 'Europa', hockey: 'nl', noNews: true, color: '#ff3b3b', logo: 'logos/hockey/nl.png' },
+    { id: 'nl', abbr: 'NL', name: 'NL', cat: 'hockey', group: 'Europa', hockey: 'nl', noNews: true, color: '#ff3b3b', logo: 'logos/hockey/nl.png' },
     { id: 'icehl', abbr: 'ICE', name: 'ICEHL', cat: 'hockey', group: 'Europa', hockey: 'icehl', color: '#ff6b6b', logo: 'logos/hockey/icehl.png' },
     { id: 'chl', abbr: 'CHL', name: 'CHL', cat: 'hockey', group: 'Europa', hockey: 'chl', color: '#ffb000', logo: 'logos/hockey/chl.png' },
     { id: 'shl', abbr: 'SHL', name: 'SHL', cat: 'hockey', group: 'Europa', hockey: 'shl', noNews: true, color: '#2fb0ff', logo: 'logos/hockey/shl.png' },
@@ -451,14 +451,22 @@
   // /api/live zählt serverseitig die laufenden Spiele aller ESPN-Ligen (nur Zahlen, kleine Antwort).
   let liveCounts = {};
   let liveTimer = null;
+  // Laufende Spiele der Hockeyweb-Ligen (App-API meldet "live"); Liga ohne Antwort behält ihren alten Wert
+  async function pollHockeyLive() {
+    const out = {};
+    await Promise.all(LEAGUES.filter((l) => l.hockey).map(async (lg) => {
+      try { out[lg.id] = ((await hockeyGames(lg, toISODate(todayAnchor()))).games || []).filter((g) => g.live).length; } catch { /* Liga nicht erreichbar */ }
+    }));
+    return out;
+  }
   async function pollLive() {
     clearTimeout(liveTimer);
     if (!document.hidden) {
       const spec = LEAGUES.filter(isEspn).map((lg) => `${lg.id}:${ymdInTZ(defaultAnchor(lg), leagueTZ(lg))}`).join(',');
-      try {
-        const res = await fetch(`/api/live?l=${encodeURIComponent(spec)}`);
-        if (res.ok) { liveCounts = (await res.json()).live || {}; renderSports(); renderLeaguebar(); renderTodayBtn(); }
-      } catch { /* nächster Versuch */ }
+      // ESPN-Ligen zählt /api/live serverseitig; Hockeyweb-Ligen (DEL, NL, …) werden einzeln abgefragt
+      const espnP = fetch(`/api/live?l=${encodeURIComponent(spec)}`).then((r) => (r.ok ? r.json() : null)).then((j) => (j && j.live) || null).catch(() => null);
+      const [espn, hock] = await Promise.all([espnP, pollHockeyLive()]);
+      if (espn || Object.keys(hock).length) { liveCounts = { ...liveCounts, ...(espn || {}), ...hock }; renderSports(); renderLeaguebar(); renderTodayBtn(); }
     }
     liveTimer = setTimeout(pollLive, 60_000);
   }
