@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '3.0.1';
+  const VERSION = '3.0.2';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -44,14 +44,14 @@
     { id: 'cbb', abbr: 'CBB', name: 'NCAAM', cat: 'basketball', group: 'College', sport: 'basketball', league: 'mens-college-basketball', groups: '50', color: '#ff9f1a' },
 
     { id: 'nhl', abbr: 'NHL', name: 'NHL', cat: 'hockey', group: 'Nordamerika', sport: 'hockey', league: 'nhl', color: '#b4c0cc' },
-    { id: 'del', abbr: 'DEL', name: 'DEL', cat: 'hockey', group: 'Deutschland', hockey: 'del', color: '#2f8cff' },
-    { id: 'del2', abbr: 'DEL2', name: 'DEL2', cat: 'hockey', group: 'Deutschland', hockey: 'del2', color: '#22b8e8' },
-    { id: 'obs', abbr: 'OL S', name: 'Oberliga Süd', cat: 'hockey', group: 'Deutschland', hockey: 'obs', color: '#7ea6ff' },
-    { id: 'obn', abbr: 'OL N', name: 'Oberliga Nord', cat: 'hockey', group: 'Deutschland', hockey: 'obn', color: '#7ea6ff' },
-    { id: 'nl', abbr: 'NL', name: 'NL (Schweiz)', cat: 'hockey', group: 'Europa', hockey: 'nl', noNews: true, color: '#ff3b3b' },
-    { id: 'icehl', abbr: 'ICE', name: 'ICEHL', cat: 'hockey', group: 'Europa', hockey: 'icehl', color: '#ff6b6b' },
-    { id: 'chl', abbr: 'CHL', name: 'CHL', cat: 'hockey', group: 'Europa', hockey: 'chl', color: '#ffb000' },
-    { id: 'shl', abbr: 'SHL', name: 'SHL', cat: 'hockey', group: 'Europa', hockey: 'shl', noNews: true, color: '#2fb0ff' },
+    { id: 'del', abbr: 'DEL', name: 'DEL', cat: 'hockey', group: 'Deutschland', hockey: 'del', color: '#2f8cff', logo: 'logos/hockey/del.png' },
+    { id: 'del2', abbr: 'DEL2', name: 'DEL2', cat: 'hockey', group: 'Deutschland', hockey: 'del2', color: '#22b8e8', logo: 'logos/hockey/del2.png' },
+    { id: 'obs', abbr: 'OL S', name: 'Oberliga Süd', cat: 'hockey', group: 'Deutschland', hockey: 'obs', color: '#7ea6ff', logo: 'logos/hockey/obs.png' },
+    { id: 'obn', abbr: 'OL N', name: 'Oberliga Nord', cat: 'hockey', group: 'Deutschland', hockey: 'obn', color: '#7ea6ff', logo: 'logos/hockey/obn.png' },
+    { id: 'nl', abbr: 'NL', name: 'NL (Schweiz)', cat: 'hockey', group: 'Europa', hockey: 'nl', noNews: true, color: '#ff3b3b', logo: 'logos/hockey/nl.png' },
+    { id: 'icehl', abbr: 'ICE', name: 'ICEHL', cat: 'hockey', group: 'Europa', hockey: 'icehl', color: '#ff6b6b', logo: 'logos/hockey/icehl.png' },
+    { id: 'chl', abbr: 'CHL', name: 'CHL', cat: 'hockey', group: 'Europa', hockey: 'chl', color: '#ffb000', logo: 'logos/hockey/chl.png' },
+    { id: 'shl', abbr: 'SHL', name: 'SHL', cat: 'hockey', group: 'Europa', hockey: 'shl', noNews: true, color: '#2fb0ff', logo: 'logos/hockey/shl.png' },
     { id: 'dcup', abbr: 'DCup', name: 'Deutschland-Cup', cat: 'hockey', group: 'Deutschland', hockey: 'dcup', color: '#e0483e' },
 
     { id: 'mlb', abbr: 'MLB', name: 'MLB', cat: 'baseball', group: 'Profis', sport: 'baseball', league: 'mlb', color: '#4a83e8' },
