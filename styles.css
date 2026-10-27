@@ -10,6 +10,7 @@
   --muted: #8d97a5;
   --accent: #e2001a;
   --live: #ff4757;
+  --today: #2ee6a6;
   --win: #3ddc84;
   --fav: #f5c542;
   --neutral-band: #1b1f27;
@@ -90,8 +91,8 @@ kbd { font-family: var(--font); font-size: 11px; padding: 1px 6px; border-radius
 
 /* Ligaleiste */
 .leaguebar {
-  display: flex; gap: 8px; align-items: center; overflow-x: auto; scrollbar-width: none;
-  padding: 8px 18px 10px; max-width: 1320px; margin: 0 auto;
+  display: flex; gap: 10px; align-items: center; overflow-x: auto; scrollbar-width: none;
+  padding: 10px 18px 12px; max-width: 1320px; margin: 0 auto;
 }
 .leaguebar::-webkit-scrollbar { display: none; }
 .lg-chip {
@@ -110,6 +111,14 @@ kbd { font-family: var(--font); font-size: 11px; padding: 1px 6px; border-radius
   font-family: var(--font); font-size: 8.5px; font-weight: 800; letter-spacing: 0; line-height: 1; text-align: center;
 }
 .lg-chip.has-live { border-color: color-mix(in srgb, var(--live) 70%, transparent); }
+/* Ligaleiste nur mit Logos (Name steht im Tooltip/aria-label); größere Logos zum Erkennen */
+.lg-chip.logo-only { padding: 3px; gap: 0; border-radius: 17px; }
+.lg-chip.logo-only .lg-logo { width: 60px; height: 46px; padding: 3px; border-radius: 15px; }
+.lg-chip.logo-only .lg-abbr { padding: 0; font-size: 12px; }
+.lg-chip.logo-only .lg-live { position: absolute; top: -4px; right: -4px; z-index: 1; }
+/* Spiele heute: Umrandung in eigener Farbe (Live = rot hat Vorrang) */
+.lg-chip.has-today { border-color: var(--today); box-shadow: 0 0 0 1.5px var(--today); }
+.lg-chip.has-live { border-color: var(--live); box-shadow: 0 0 0 1.5px var(--live); }
 .lg-live, .sport-live {
   min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; font-family: var(--font); font-size: 10.5px; font-weight: 800;
   background: var(--live); color: #fff; display: inline-flex; align-items: center; justify-content: center; gap: 3px; letter-spacing: 0;
@@ -409,7 +418,7 @@ dialog.search::backdrop { background: rgba(0, 0, 0, .6); backdrop-filter: blur(4
   .sport-label { display: none; }
   .sport-badge, .sport-live { position: absolute; top: 0; right: 50%; margin-right: -22px; }
   .search-trigger { width: 38px; height: 38px; justify-content: center; padding: 0; }
-  .leaguebar { padding: 6px 12px 9px; gap: 6px; }
+  .leaguebar { padding: 9px 12px 11px; gap: 8px; }
   .container { padding: 12px 12px calc(20px + var(--bottom-nav)); }
   .hero { padding: 14px; border-radius: 16px; }
   .hero-name { font-size: 26px; }

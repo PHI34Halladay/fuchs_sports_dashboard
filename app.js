@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '3.0.3';
+  const VERSION = '3.1.0';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -124,14 +124,14 @@
     d.setHours(12, 0, 0, 0);
     return d;
   }
-  // US-Ligen: Die Spiele der Nacht laufen in deutscher Zeit nach Mitternacht – bis 10 Uhr
-  // morgens gilt daher noch der Vortag als "aktueller" Spieltag. Europäische Ligen: Kalendertag.
+  // US-Ligen: Die Spiele der Nacht laufen in deutscher Zeit nach Mitternacht – ein Spieltag reicht daher
+  // von 12:00 Uhr bis 11:59 Uhr des Folgetags (vor 12 Uhr gilt noch der Vortag). Europäische Ligen: Kalendertag.
   function defaultAnchor(lg) {
     const d = todayAnchor();
-    if (lg && US_LEAGUE_IDS.has(lg.id) && new Date().getHours() < 10) d.setDate(d.getDate() - 1);
+    if (lg && US_LEAGUE_IDS.has(lg.id) && new Date().getHours() < 12) d.setDate(d.getDate() - 1);
     return d;
   }
-  // ESPN-Abfragetag einer Liga für ein Datum der Favoriten-Ansicht ("heute" vor 10 Uhr → US-Vortag)
+  // ESPN-Abfragetag einer Liga für ein Datum der Favoriten-Ansicht ("heute" vor 12 Uhr → US-Vortag)
   function espnDayFor(lg, d) {
     const base = (ymdOf(d) === ymdOf(todayAnchor())) ? defaultAnchor(lg) : d;
     return ymdInTZ(base, leagueTZ(lg));
@@ -468,6 +468,7 @@
       const [espn, hock] = await Promise.all([espnP, pollHockeyLive()]);
       if (espn || Object.keys(hock).length) { liveCounts = { ...liveCounts, ...(espn || {}), ...hock }; renderSports(); renderLeaguebar(); renderTodayBtn(); }
     }
+    refreshTodayMarks();
     liveTimer = setTimeout(pollLive, 60_000);
   }
   const liveIn = (pred) => LEAGUES.filter(pred).reduce((n, l) => n + (+liveCounts[l.id] || 0), 0);
@@ -501,7 +502,7 @@
     await Promise.all(LEAGUES.map(async (lg) => {
       try {
         if (isEspn(lg)) {
-          const anchor = defaultAnchor(lg); // US-Ligen: bis 10 Uhr zählt noch der Vortag
+          const anchor = defaultAnchor(lg); // US-Ligen: bis 12 Uhr zählt noch der Vortag
           const days = await gameDaySet(lg, anchor);
           if (days && days.has(ymdInTZ(anchor, leagueTZ(lg)))) out.add(lg.id);
         } else if (lg.hockey) {
@@ -512,6 +513,19 @@
       } catch { /* Quelle nicht erreichbar: Liga gilt als ohne Spiel */ }
     }));
     return out;
+  }
+
+  // Ligen mit Spiel heute werden in der Ligaleiste immer umrandet (auch ohne Filter): Stand alle 3 Minuten erneuern
+  let todayMarkBusy = false;
+  async function refreshTodayMarks() {
+    if (todayMarkBusy || todayBusy || document.hidden) return;
+    if (todayLeagues && Date.now() - todayLoadedAt < TODAY_TTL_MS) return;
+    todayMarkBusy = true;
+    try {
+      todayLeagues = await computeTodayLeagues();
+      todayLoadedAt = Date.now();
+      renderLeaguebar(); renderSports();
+    } catch { /* nächster Versuch */ } finally { todayMarkBusy = false; }
   }
 
   async function setTodayOnly(on) {
@@ -579,8 +593,9 @@
       : '';
     el.leaguebar.innerHTML = liveChip + members.map((l) => {
       const live = +liveCounts[l.id] || 0;
-      return `<button type="button" class="lg-chip${l.id === lg.id ? ' active' : ''}${live ? ' has-live' : ''}" data-league="${l.id}" style="--lg:${l.color}">
-        ${leagueBadge(l)}<span>${esc(l.name)}</span>${live ? `<span class="lg-live" title="${live} live">${live}</span>` : ''}
+      const today = hasGameToday(l.id);
+      return `<button type="button" class="lg-chip logo-only${l.id === lg.id ? ' active' : ''}${live ? ' has-live' : ''}${today ? ' has-today' : ''}" data-league="${l.id}" style="--lg:${l.color}" aria-label="${esc(l.name)}${today ? ' – heute Spiele' : ''}" title="${esc(l.name)}${today ? ' – heute Spiele' : ''}">
+        ${leagueBadge(l)}${live ? `<span class="lg-live" title="${live} live">${live}</span>` : ''}
       </button>`;
     }).join('');
     el.leaguebar.querySelector('.lg-chip.active')?.scrollIntoView({ block: 'nearest', inline: 'center' });
