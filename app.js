@@ -4,19 +4,19 @@
 (() => {
   'use strict';
 
-  const VERSION = '3.1.0';
+  const VERSION = '3.2.0';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
 
   // Sportarten = obere Navigationsebene; jede Liga gehört genau zu einer (cat).
   const SPORTS = [
-    { id: 'fav', icon: '★', label: 'Favoriten' },
-    { id: 'soccer', icon: '⚽', label: 'Fußball' },
-    { id: 'football', icon: '🏈', label: 'Football' },
-    { id: 'basketball', icon: '🏀', label: 'Basketball' },
-    { id: 'hockey', icon: '🏒', label: 'Eishockey' },
-    { id: 'baseball', icon: '⚾', label: 'Baseball' },
+    { id: 'fav', icon: '★', label: 'Favoriten', color: '#f5c542' },
+    { id: 'soccer', icon: '⚽', label: 'Fußball', color: '#22c979' },
+    { id: 'football', icon: '🏈', label: 'Football', color: '#d0803a' },
+    { id: 'basketball', icon: '🏀', label: 'Basketball', color: '#ff8a1f' },
+    { id: 'hockey', icon: '🏒', label: 'Eishockey', color: '#38bdf8' },
+    { id: 'baseball', icon: '⚾', label: 'Baseball', color: '#8b7cff' },
   ];
 
   // Ligen. sport/league = ESPN-Pfad. amateur: Fussball.de (teams = Schlüssel in api/_fussballde.js),
@@ -38,10 +38,10 @@
     { id: 'mls', abbr: 'MLS', name: 'MLS', cat: 'soccer', group: 'Amerika', sport: 'soccer', league: 'usa.1', color: '#5a8dee' },
 
     { id: 'nfl', abbr: 'NFL', name: 'NFL', cat: 'football', group: 'Profis', sport: 'football', league: 'nfl', color: '#3a7bec' },
-    { id: 'cfb', abbr: 'CFB', name: 'NCAAF', cat: 'football', group: 'College', sport: 'football', league: 'college-football', groups: '80', color: '#e0483e' },
+    { id: 'cfb', abbr: 'CFB', name: 'NCAAF', cat: 'football', group: 'College', sport: 'football', league: 'college-football', groups: '80', color: '#e0483e', logo: 'logos/college/cfb.png' },
 
     { id: 'nba', abbr: 'NBA', name: 'NBA', cat: 'basketball', group: 'Profis', sport: 'basketball', league: 'nba', color: '#f0484e' },
-    { id: 'cbb', abbr: 'CBB', name: 'NCAAM', cat: 'basketball', group: 'College', sport: 'basketball', league: 'mens-college-basketball', groups: '50', color: '#ff9f1a' },
+    { id: 'cbb', abbr: 'CBB', name: 'NCAAM', cat: 'basketball', group: 'College', sport: 'basketball', league: 'mens-college-basketball', groups: '50', color: '#ff9f1a', logo: 'logos/college/cbb.png' },
 
     { id: 'nhl', abbr: 'NHL', name: 'NHL', cat: 'hockey', group: 'Nordamerika', sport: 'hockey', league: 'nhl', color: '#b4c0cc' },
     { id: 'del', abbr: 'DEL', name: 'DEL', cat: 'hockey', group: 'Deutschland', hockey: 'del', color: '#2f8cff', logo: 'logos/hockey/del.png' },
@@ -571,8 +571,9 @@
       const badge = s.id === 'fav' && pins.length ? `<span class="sport-badge">${pins.length}</span>` : '';
       const live = s.id === 'fav' ? 0 : liveIn((l) => l.cat === s.id);
       const liveBadge = live ? `<span class="sport-live" title="${live} Spiel${live === 1 ? '' : 'e'} live">${live}</span>` : '';
-      return `<button type="button" class="sport-btn${s.id === cat ? ' active' : ''}${s.id === 'fav' ? ' sport-fav' : ''}${live ? ' has-live' : ''}" data-sport="${s.id}" aria-label="${esc(s.label)}" title="${esc(s.label)}" aria-pressed="${s.id === cat}">
-        <span class="sport-icon" aria-hidden="true">${s.icon}</span><span class="sport-label">${esc(s.label)}</span>${badge}${liveBadge}
+      const today = s.id !== 'fav' && LEAGUES.some((l) => l.cat === s.id && !l.isLive && hasGameToday(l.id));
+      return `<button type="button" class="sport-btn${s.id === cat ? ' active' : ''}${s.id === 'fav' ? ' sport-fav' : ''}${live ? ' has-live' : ''}${today ? ' has-today' : ''}" data-sport="${s.id}" style="--sp:${s.color}" aria-label="${esc(s.label)}${today ? ' – heute Spiele' : ''}" title="${esc(s.label)}${today ? ' – heute Spiele' : ''}" aria-pressed="${s.id === cat}">
+        <span class="sport-tile"><span class="sport-icon" aria-hidden="true">${s.icon}</span>${badge}${liveBadge}</span><span class="sport-label">${esc(s.label)}</span>
       </button>`;
     }).join('');
     const act = el.sports.querySelector('.sport-btn.active');

@@ -59,22 +59,42 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .topbar-row .brand { flex: 1 1 0; min-width: 0; }
 .brand-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .topbar-tools { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
-/* Sportarten: eigene Reihe über der Ligaleiste */
+/* Sportarten: „Dock“ aus Kacheln – je Sportart eigene Farbe, aktive Kachel leuchtet, Label immer sichtbar */
 .sports {
-  display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
-  padding: 2px 18px 4px; max-width: 1320px; margin: 0 auto;
+  display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none;
+  padding: 6px 18px 4px; max-width: 1320px; margin: 0 auto;
 }
 .sports::-webkit-scrollbar { display: none; }
+.sports > :first-child { margin-left: auto; }
+.sports > :last-child { margin-right: auto; }
 .sport-btn {
-  flex-shrink: 0; position: relative; display: inline-flex; align-items: center; gap: 7px;
-  background: transparent; border: 0; border-radius: 999px; padding: 7px 14px;
-  color: var(--muted); font-weight: 600; font-size: 14px; transition: background .15s, color .15s;
+  --sp: #888; flex-shrink: 0; position: relative; display: inline-flex; flex-direction: column; align-items: center; gap: 5px;
+  background: transparent; border: 0; border-radius: 18px; padding: 4px 10px; min-width: 72px;
+  color: var(--muted); font-weight: 600; font-size: 12px; letter-spacing: .2px; transition: color .15s;
 }
-.sport-btn:hover { color: var(--text); background: rgba(255, 255, 255, .05); }
-.sport-btn.active { color: var(--text); background: color-mix(in srgb, var(--accent) 22%, var(--surface-2)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); }
-.sport-icon { font-size: 16px; line-height: 1; }
+.sport-btn:hover { color: var(--text); }
+.sport-tile {
+  position: relative; display: grid; place-items: center; width: 54px; height: 42px; border-radius: 15px;
+  background: color-mix(in srgb, var(--sp) 13%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--sp) 26%, transparent);
+  transition: transform .18s cubic-bezier(.3, 1.5, .5, 1), background .18s, box-shadow .18s, border-color .18s;
+}
+.sport-btn:hover .sport-tile { transform: translateY(-2px); background: color-mix(in srgb, var(--sp) 22%, var(--surface)); }
+.sport-icon { font-size: 23px; line-height: 1; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .35)); }
 .sport-fav .sport-icon { color: var(--fav); }
+.sport-btn.active { color: #fff; }
+.sport-btn.active .sport-tile {
+  transform: translateY(-2px); border-color: transparent;
+  background: linear-gradient(150deg, color-mix(in srgb, var(--sp) 92%, #fff), color-mix(in srgb, var(--sp) 58%, #000));
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--sp) 42%, transparent);
+}
+.sport-btn.active .sport-label { text-shadow: 0 0 12px color-mix(in srgb, var(--sp) 70%, transparent); }
+.sport-btn.active::after {
+  content: ''; position: absolute; left: 50%; bottom: -3px; width: 18px; height: 3px; margin-left: -9px; border-radius: 3px; background: var(--sp);
+}
+.sport-label { line-height: 1; white-space: nowrap; }
 .sport-badge {
+  position: absolute; top: -6px; right: -7px; z-index: 1;
   min-width: 17px; height: 17px; padding: 0 5px; border-radius: 999px; font-size: 10px; font-weight: 700;
   background: var(--fav); color: #111; display: inline-flex; align-items: center; justify-content: center;
 }
@@ -125,8 +145,12 @@ kbd { font-family: var(--font); font-size: 11px; padding: 1px 6px; border-radius
   box-shadow: 0 0 10px color-mix(in srgb, var(--live) 60%, transparent);
 }
 .lg-live::before, .sport-live::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: #fff; animation: pulse 1.2s infinite; }
-.sport-btn.has-live { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--live) 75%, transparent); }
-.sport-btn.active.has-live { box-shadow: inset 0 0 0 1.5px var(--live); }
+/* Spiele heute: grüne Umrandung der Kachel; läuft etwas live, ist sie rot (Vorrang) – wie in der Ligaleiste */
+.sport-btn.has-today .sport-tile { border-color: var(--today); box-shadow: 0 0 0 1.5px var(--today); }
+.sport-btn.has-live .sport-tile { border-color: var(--live); box-shadow: 0 0 0 1.5px var(--live); }
+.sport-btn.active.has-today .sport-tile { box-shadow: 0 0 0 1.5px var(--today), 0 7px 18px color-mix(in srgb, var(--sp) 42%, transparent); }
+.sport-btn.active.has-live .sport-tile { box-shadow: 0 0 0 1.5px var(--live), 0 7px 18px color-mix(in srgb, var(--sp) 42%, transparent); }
+.sport-live { position: absolute; top: -6px; right: -7px; z-index: 1; }
 .hero-abbr { font-family: var(--font); font-size: 15px; font-weight: 800; color: #fff; }
 .lg-info { display: flex; gap: 16px; align-items: center; font-size: 13px; color: #c7cfd9; white-space: nowrap; }
 
@@ -412,11 +436,10 @@ dialog.search::backdrop { background: rgba(0, 0, 0, .6); backdrop-filter: blur(4
   .brand { flex: 1; }
   /* Sportarten oben als scrollbare Reihe */
   /* Mobil: nur Symbole, gleichmäßig über die volle Breite verteilt */
-  .sports { padding: 2px 8px 4px; gap: 2px; overflow-x: hidden; }
-  .sport-btn { flex: 1 1 0; min-width: 0; justify-content: center; padding: 8px 0; }
+  .sports { padding: 8px 6px 6px; gap: 0; overflow-x: hidden; }
+  .sport-btn { flex: 1 1 0; min-width: 0; padding: 2px 0; font-size: 10.5px; }
+  .sport-tile { width: 46px; height: 38px; border-radius: 14px; }
   .sport-icon { font-size: 21px; }
-  .sport-label { display: none; }
-  .sport-badge, .sport-live { position: absolute; top: 0; right: 50%; margin-right: -22px; }
   .search-trigger { width: 38px; height: 38px; justify-content: center; padding: 0; }
   .leaguebar { padding: 9px 12px 11px; gap: 8px; }
   .container { padding: 12px 12px calc(20px + var(--bottom-nav)); }
