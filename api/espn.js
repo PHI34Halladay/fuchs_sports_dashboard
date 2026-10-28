@@ -60,8 +60,7 @@ function buildUrl(q) {
       // bestimmten Woche abfragen (Kalender liefert dort nur Wochen-Grenzen, keine Tage).
       if (q.week && RE_WEEK.test(q.week)) params.set('week', q.week);
       if (q.seasontype && RE_SEASONTYPE.test(q.seasontype)) params.set('seasontype', q.seasontype);
-      // ESPN lehnt Datumsbereiche zusammen mit limit mit 400 ab → bei Bereichen ohne limit abfragen
-      if (!/-/.test(q.dates || '')) params.set('limit', '300');
+      params.set('limit', '300');
       break;
     case 'summary':
       if (!RE_NUM.test(q.event || '') && !/^\d{6,12}$/.test(q.event || '')) {
@@ -113,7 +112,63 @@ function buildUrl(q) {
   return qs ? `${url}?${qs}` : url;
 }
 
+// ESPN lehnt Datumsbereiche (dates=von-bis) bei Fußball mit 400 ab, einzelne Tage funktionieren.
+// Der Proxy zerlegt Bereiche (höchstens 14 Tage) deshalb selbst in Einzeltage und liefert die Events
+// zusammengefasst plus `days` = die abgefragten Tage (YYYYMMDD), an denen es Spiele gibt.
+const MAX_RANGE_DAYS = 14;
+function expandRange(dates) {
+  const m = /^(\d{4})(\d{2})(\d{2})-(\d{4})(\d{2})(\d{2})$/.exec(dates || '');
+  if (!m) return null;
+  const a = Date.UTC(+m[1], +m[2] - 1, +m[3]);
+  const b = Date.UTC(+m[4], +m[5] - 1, +m[6]);
+  if (!(b >= a) || (b - a) / 864e5 + 1 > MAX_RANGE_DAYS) return [];
+  const out = [];
+  for (let t = a; t <= b; t += 864e5) {
+    const d = new Date(t);
+    out.push(`${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`);
+  }
+  return out;
+}
+
+async function fetchJson(target) {
+  const upstream = await fetch(target, {
+    headers: { 'User-Agent': 'espn-dashboard/1.0', Accept: 'application/json' },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!upstream.ok) throw Object.assign(new Error(`ESPN antwortet mit ${upstream.status}`), { status: upstream.status });
+  return upstream.json();
+}
+
+async function handleRange(q, res) {
+  const days = expandRange(q.dates);
+  if (!days || !days.length) { res.status(400).json({ error: 'Ungültiger Datumsbereich (höchstens 14 Tage)' }); return; }
+  try {
+    const parts = await Promise.all(days.map(async (day) => {
+      const data = await fetchJson(buildUrl({ ...q, dates: day }));
+      return { day, data };
+    }));
+    const events = [];
+    const seen = new Set();
+    const gameDays = [];
+    for (const { day, data } of parts) {
+      const evs = (data.events || []).filter((e) => e && !seen.has(e.id));
+      evs.forEach((e) => seen.add(e.id));
+      if (evs.length) gameDays.push(day);
+      events.push(...evs);
+    }
+    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=900');
+    res.status(200).json({ leagues: parts[0].data.leagues, events, days: gameDays, range: q.dates });
+  } catch (e) {
+    res.status(e.status || 502).json({ error: e.message || 'ESPN nicht erreichbar' });
+  }
+}
+
 async function handler(req, res) {
+  if (req.query && req.query.type === 'scoreboard' && /-/.test(req.query.dates || '')) {
+    try { buildUrl({ ...req.query, dates: String(req.query.dates).slice(0, 8) }); } catch (e) { res.status(400).json({ error: e.message }); return; }
+    await handleRange(req.query, res);
+    return;
+  }
   let target;
   try {
     target = buildUrl(req.query || {});
@@ -147,3 +202,4 @@ async function handler(req, res) {
 
 module.exports = handler;
 module.exports.buildUrl = buildUrl;
+module.exports.expandRange = expandRange;

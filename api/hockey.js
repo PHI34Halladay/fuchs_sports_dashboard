@@ -249,6 +249,12 @@ async function handler(req, res) {
     return;
   }
   try {
+    if (q.debug === 'rounds') { // Diagnose: alle Runden der Saison (keine Zugangsdaten)
+      const all = app.mapRounds(await getApp('roundsForSeason', { seasonId: app.SEASON_ID }, 60));
+      res.status(200).json({ api: al.api, mine: all[al.api] || null, all });
+      return;
+    }
+    if (q.src === 'web' && lg) { await handleGames(lg, key, date, res); return; } // Diagnose: Hockeyweb-Seiten statt App-API
     if (q.type === 'match' || q.type === 'news') {
       if (q.type === 'match') await handleMatchApp(al, key, q, res); else await handleNewsApp(al, key, res);
       return;
