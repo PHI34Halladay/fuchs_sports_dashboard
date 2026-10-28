@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '3.4.0';
+  const VERSION = '3.5.0';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -2323,6 +2323,7 @@
   window.Reader.init({ api, esc });
   window.Profile.init({
     api, esc,
+    leagueId: leagueIdFor,
     fav: {
       get: (teamId, ctx) => { const id = leagueIdFor(ctx); return id ? isFav(teamId, id) : null; },
       toggle: (teamId, ctx) => {

@@ -18,22 +18,32 @@
       <button class="pf-close" aria-label="Schließen">×</button>
       <div class="pf-scroll" id="pfScroll">
         <div class="pf-head" id="pfHead"></div>
+        <div class="pf-tabs" id="pfTabs" role="tablist"></div>
         <div class="pf-body" id="pfBody"></div>
       </div>
     </div>`;
   document.body.appendChild(dlg);
   const $head = dlg.querySelector('#pfHead');
   const $body = dlg.querySelector('#pfBody');
+  const $tabs = dlg.querySelector('#pfTabs');
+  let reopening = false; // Dialog neu öffnen, um ihn über andere Popups (Spiel) zu holen
   const $scroll = dlg.querySelector('#pfScroll');
 
   function close() {
     reqId++;
     if (dlg.open) dlg.close();
   }
-  dlg.addEventListener('close', () => { reqId++; dlg.querySelectorAll('video').forEach((v) => v.pause()); });
+  dlg.addEventListener('close', () => { dlg.querySelectorAll('video').forEach((v) => v.pause()); if (reopening) { reopening = false; return; } reqId++; });
   dlg.addEventListener('click', (e) => {
     if (e.target === dlg) { close(); return; }
     if (e.target.closest('.pf-close')) { close(); return; }
+    // Tabs im Spielerprofil
+    const tabBtn = e.target.closest('[data-pf-tab]');
+    if (tabBtn) {
+      e.stopPropagation();
+      if (pl) { pl.tab = tabBtn.dataset.pfTab; renderPlayer(); $scroll.scrollTop = Math.min($scroll.scrollTop, $head.offsetHeight); }
+      return;
+    }
     // Video im Profil: Vorschaubild antippen → Abspielen direkt in der App
     const vf = e.target.closest('.gc-video-frame[data-video-src]');
     if (vf) {
@@ -58,7 +68,10 @@
     const t = e.target.closest('[data-team-id]');
     if (t) { e.stopPropagation(); openTeam(t.dataset.teamId); return; }
     const p = e.target.closest('[data-player-id]');
-    if (p) { e.stopPropagation(); openPlayer(p.dataset.playerId); }
+    if (p) { e.stopPropagation(); openPlayer(p.dataset.playerId); return; }
+    // Spiel antippen → Spiel-Popup (Gamecast)
+    const g = e.target.closest('[data-pf-game]');
+    if (g) { e.stopPropagation(); openGame(g.dataset.pfGame, g.dataset.pfLeague); }
   });
 
   // ---------- Teamfarben als Akzent ----------
@@ -91,12 +104,24 @@
   function startLoad() {
     const id = ++reqId;
     $head.innerHTML = '';
+    $tabs.innerHTML = '';
     $body.innerHTML = '<div class="gc-loading"><div class="skeleton"></div><div class="skeleton"></div></div>';
     $scroll.scrollTop = 0;
     dlg.style.removeProperty('--pf-accent');
     dlg.style.removeProperty('--pf-brand-rgb');
-    if (!dlg.open) dlg.showModal();
+    // Läuft das Profil schon (z. B. Klick auf einen Spieler im Spiel-Popup), nach oben holen
+    if (dlg.open) { reopening = true; dlg.close(); }
+    dlg.showModal();
     return id;
+  }
+
+  const RE_SLUG = /^[a-z0-9._-]{2,40}$/;
+  // Spiel aus dem Profil öffnen: das Spiel-Popup legt sich über das Profil, beim Schließen ist man wieder dort
+  function openGame(eventId, slug) {
+    if (!window.Gamecast || !eventId || !activeLeague) return;
+    const league = { sport: activeLeague.sport, league: RE_SLUG.test(slug || '') ? slug : activeLeague.league };
+    league.id = ctx.leagueId?.(league) || undefined;
+    window.Gamecast.open(eventId, { link: null, league });
   }
 
   async function openPlayer(id, league) {
@@ -179,13 +204,15 @@
       for (const cat of st.categories || []) {
         for (const e of cat.events || []) {
           if (!e?.eventId || !Array.isArray(e.stats) || rows.has(e.eventId) || !evMap[e.eventId]) continue;
-          rows.set(e.eventId, { meta: evMap[e.eventId], stats: e.stats });
+          rows.set(e.eventId, { id: String(e.eventId), meta: evMap[e.eventId], stats: e.stats });
         }
       }
     }
-    const list = [...rows.values()].sort((x, y) => new Date(y.meta.gameDate) - new Date(x.meta.gameDate)).slice(0, 10);
+    const list = [...rows.values()].sort((x, y) => new Date(y.meta.gameDate) - new Date(x.meta.gameDate)).slice(0, 15);
     return list.length ? { labels: gl.labels || [], names: gl.displayNames || [], list } : null;
   }
+
+  const lbl = (soccer, l) => (soccer && SOCCER_LABELS[l]) || l;
 
   function statTables(ov, soccer) {
     const raw = ov?.statistics;
@@ -195,37 +222,66 @@
       // Wettbewerbe ohne einen einzigen Wert (z. B. Nations League ohne Einsatz) ausblenden
       const used = splits.filter((s) => s.stats.some((v) => v && v !== '0' && v !== '--' && v !== '0.0'));
       if (used.length) splits = used;
-      const head = t.labels.map((l, i) => `<th title="${ctx.esc(t.displayNames?.[i] || '')}">${ctx.esc((soccer && SOCCER_LABELS[l]) || l)}</th>`).join('');
+      const head = t.labels.map((l, i) => `<th title="${ctx.esc(t.displayNames?.[i] || '')}">${ctx.esc(lbl(soccer, l))}</th>`).join('');
       const body = splits.map((s) => `<tr><td>${ctx.esc(splitName(s.displayName))}</td>${t.labels.map((_, i) => `<td>${ctx.esc(s.stats[i] ?? '–')}</td>`).join('')}</tr>`).join('');
-      return `<div class="table-wrap"><table class="pf-tbl"><thead><tr><th></th>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+      const legend = t.labels.map((l, i) => `<span><b>${ctx.esc(lbl(soccer, l))}</b> ${ctx.esc(t.displayNames?.[i] || '')}</span>`).join('');
+      return `<div class="table-wrap"><table class="pf-tbl"><thead><tr><th></th>${head}</tr></thead><tbody>${body}</tbody></table></div>
+        <details class="pf-legend"><summary>Was bedeuten die Spalten?</summary><div>${legend}</div></details>`;
     }).join('');
   }
 
-  function gamelogHtml(g, soccer) {
-    const badge = (r) => { const m = RES_DE[r]; return m ? `<span class="pf-res pf-res-${m[1]}">${m[0]}</span>` : '<span class="pf-res"></span>'; };
-    const form = g.list.slice(0, 5).map((r) => badge(r.meta.gameResult)).join('');
-    const head = g.labels.map((l, i) => `<th title="${ctx.esc(g.names[i] || '')}">${ctx.esc((soccer && SOCCER_LABELS[l]) || l)}</th>`).join('');
-    const body = g.list.map(({ meta: m, stats }) => {
-      const opp = m.opponent || {};
-      const hs = m.homeTeamScore, as = m.awayTeamScore;
-      const score = hs !== undefined && hs !== '' && as !== undefined && as !== '' ? `${hs}:${as}` : String(m.score || '');
+  const resBadge = (r) => { const m = RES_DE[r]; return m ? `<span class="pf-res pf-res-${m[1]}">${m[0]}</span>` : '<span class="pf-res"></span>'; };
+  function gameScore(m) {
+    const hs = m.homeTeamScore, as = m.awayTeamScore;
+    return hs !== undefined && hs !== '' && as !== undefined && as !== '' ? `${hs}:${as}` : String(m.score || '');
+  }
+  const gameAttrs = (r) => `data-pf-game="${ctx.esc(r.id)}"${r.meta.leagueSlug ? ` data-pf-league="${ctx.esc(r.meta.leagueSlug)}"` : ''}`;
+
+  // Kompakte, antippbare Spielzeile (Übersicht)
+  function gameLine(r) {
+    const m = r.meta, opp = m.opponent || {};
+    return `<button type="button" class="pf-gl-line" ${gameAttrs(r)}>
+      <span class="pf-gl-date">${ctx.esc(fmtDate(m.gameDate, { day: '2-digit', month: '2-digit' }))}</span>
+      ${resBadge(m.gameResult)}
+      <span class="pf-gl-opp"><span class="muted">${ctx.esc(m.atVs || '')}</span> ${opp.logo ? `<img src="${ctx.esc(opp.logo)}" alt="" loading="lazy">` : ''}${ctx.esc(opp.displayName || opp.abbreviation || '')}</span>
+      <span class="pf-gl-score">${ctx.esc(gameScore(m))}</span><span class="pf-chev">›</span>
+    </button>`;
+  }
+
+  function formStrip(g) {
+    return `<div class="pf-form">${g.list.slice(0, 5).map((r) => resBadge(r.meta.gameResult)).join('')}<span class="muted">Form (neueste zuerst)</span></div>`;
+  }
+
+  function gamelogTable(g, soccer) {
+    const head = g.labels.map((l, i) => `<th title="${ctx.esc(g.names[i] || '')}">${ctx.esc(lbl(soccer, l))}</th>`).join('');
+    const body = g.list.map((r) => {
+      const m = r.meta, opp = m.opponent || {};
       const oppName = ctx.esc(opp.abbreviation || opp.displayName || '');
       const oppEl = opp.id ? `<span class="gc-link" data-team-id="${ctx.esc(opp.id)}">${oppName}</span>` : oppName;
-      return `<tr>
+      return `<tr class="pf-gl-row" ${gameAttrs(r)}>
         <td><div class="pf-gl-game">
           <span class="pf-gl-date">${ctx.esc(fmtDate(m.gameDate, { day: '2-digit', month: '2-digit' }))}</span>
-          ${badge(m.gameResult)}
+          ${resBadge(m.gameResult)}
           <span class="muted">${ctx.esc(m.atVs || '')}</span>
           ${opp.logo ? `<img src="${ctx.esc(opp.logo)}" alt="" loading="lazy">` : ''}${oppEl}
-          <span class="pf-gl-score">${ctx.esc(score)}</span>
+          <span class="pf-gl-score">${ctx.esc(gameScore(m))}</span>
         </div></td>
-        ${g.labels.map((_, i) => `<td>${ctx.esc(stats[i] ?? '–')}</td>`).join('')}</tr>`;
+        ${g.labels.map((_, i) => `<td>${ctx.esc(r.stats[i] ?? '–')}</td>`).join('')}<td class="pf-chev">›</td></tr>`;
     }).join('');
-    const leagueNote = g.list[0]?.meta?.leagueShortName || '';
-    return section(`Letzte Spiele${leagueNote ? ` <span class="muted">· ${ctx.esc(leagueNote)}</span>` : ''}`,
-      `<div class="pf-form">${form}<span class="muted">Form (neueste zuerst)</span></div>
-       <div class="table-wrap"><table class="pf-tbl pf-gl"><thead><tr><th>Spiel</th>${head}</tr></thead><tbody>${body}</tbody></table></div>`);
+    return `<div class="table-wrap"><table class="pf-tbl pf-gl"><thead><tr><th>Spiel</th>${head}<th></th></tr></thead><tbody>${body}</tbody></table></div>
+      <div class="gc-note">Spiel antippen für Aufstellung, Verlauf und Boxscore · Gegner antippen für das Teamprofil</div>`;
   }
+
+  const newsRow = (n, i) => {
+    const img = (n.images || []).find((x) => x.url)?.url;
+    const when = fmtDate(n.published, { day: '2-digit', month: '2-digit', year: 'numeric' });
+    return `<button type="button" class="pf-news" data-pf-news="${i}">
+      ${img ? `<img src="${ctx.esc(img)}" alt="" loading="lazy">` : '<span class="pf-news-ph"></span>'}
+      <span class="pf-news-t">${ctx.esc(n.headline)}<small>${n.type === 'Media' ? '▶ Video · ' : ''}${ctx.esc(when)}</small></span>
+    </button>`;
+  };
+
+  const TAB_ORDER = ['ueb', 'stat', 'spiele', 'medien', 'karriere', 'kader'];
 
   function renderPlayer() {
     const { a, raw, ov, gl, bio } = pl;
@@ -245,11 +301,13 @@
           <div class="pf-name">${ctx.esc(a.displayName || '')}</div>
           <div class="pf-sub">${a.jersey ? `#${ctx.esc(a.jersey)} · ` : ''}${ctx.esc(pos)}${!statusActive ? ` · <span class="pf-status">${ctx.esc(a.status?.name || '')}</span>` : ''}</div>
           ${nation ? `<div class="pf-sub pf-nation">${a.flag?.href ? `<img src="${ctx.esc(a.flag.href)}" alt="">` : ''}${ctx.esc(nation)}</div>` : ''}
-          ${a.team?.id ? `<button type="button" class="pf-team-chip" data-team-id="${ctx.esc(a.team.id)}">${window.LogoPref.img(a.team.id, teamLogo)}${ctx.esc(teamName)}</button>` : ''}
+          ${a.team?.id ? `<button type="button" class="pf-team-chip" data-team-id="${ctx.esc(a.team.id)}">${window.LogoPref.img(a.team.id, teamLogo)}${ctx.esc(teamName)}<span class="pf-chev">›</span></button>` : ''}
         </div>
       </div>`;
 
-    // --- Profil ---
+    const glData = parseGamelog(gl);
+
+    // ---- Übersicht ----
     const m = metric(a);
     const dob = a.dateOfBirth ? fmtDate(a.dateOfBirth, { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' }) : (a.displayDOB || '');
     const bioRows = [
@@ -260,64 +318,74 @@
       ['Draft', a.displayDraft], ['Hand', a.hand?.displayValue], ['College', a.collegeAthlete?.school || a.college?.name],
       ['Fuß', a.foot?.displayValue || a.preferredFoot?.displayValue],
     ].filter(([, v]) => v !== undefined && v !== null && v !== '');
-    const bioHtml = bioRows.length ? section('Profil', `<dl class="gc-info pf-bio">${bioRows.map(([k, v]) => `<dt>${ctx.esc(k)}</dt><dd>${ctx.esc(v)}</dd>`).join('')}</dl>`) : '';
+    const bioHtml = bioRows.length ? section('Steckbrief', `<dl class="gc-info pf-bio">${bioRows.map(([k, v]) => `<dt>${ctx.esc(k)}</dt><dd>${ctx.esc(v)}</dd>`).join('')}</dl>`) : '';
 
-    // --- Saison-Kacheln (ESPN statsSummary) ---
     const stats = a.statsSummary?.statistics || [];
     const statsHtml = stats.length
-      ? section(ctx.esc(a.statsSummary.displayName || 'Statistik'), `<div class="pf-stats">${stats.map((s) => `
+      ? section(ctx.esc(a.statsSummary.displayName || 'Saison'), `<div class="pf-stats">${stats.map((s) => `
           <div class="pf-stat"><div class="pf-stat-val">${ctx.esc(s.displayValue)}</div><div class="pf-stat-label">${ctx.esc(s.shortDisplayName || s.abbreviation || s.displayName)}</div>${s.rankDisplayValue ? `<div class="pf-stat-rank">${ctx.esc(s.rankDisplayValue)}</div>` : ''}</div>`).join('')}</div>`)
       : '';
 
-    // --- Verletzung ---
     const injuries = (a.injuries || []).filter((i) => i.status || i.details);
     const injHtml = injuries.length
       ? section('Verletzung', injuries.map((i) => `<div class="gc-row"><span>${ctx.esc(i.status || '')}</span><span class="muted">${ctx.esc(i.details?.type || i.longComment || i.shortComment || '')}</span></div>`).join(''))
       : '';
 
-    // --- Zusatzdaten (kommen nach den Grunddaten) ---
-    const tables = statTables(ov, soccer);
-    const tableHtml = tables ? section('Statistik', tables) : '';
-    const glData = parseGamelog(gl);
-    const glHtml = glData ? gamelogHtml(glData, soccer) : '';
+    const recentHtml = glData ? section(`Letzte Spiele <button type="button" class="pf-more" data-pf-tab="spiele">Alle ›</button>`,
+      formStrip(glData) + `<div class="pf-gl-lines">${glData.list.slice(0, 3).map(gameLine).join('')}</div>`) : '';
+    const newsTeaser = pl.news[0] ? section(`Neueste News <button type="button" class="pf-more" data-pf-tab="medien">Mehr ›</button>`, newsRow(pl.news[0], 0)) : '';
+    const loading = pl.loadingExtras ? '<div class="gc-loading"><div class="skeleton"></div><div class="skeleton"></div></div>' : '';
 
-    const vids = (raw?.videos || []).map((v) => ({ v, src: v.links?.source?.HD?.href || v.links?.source?.href })).filter((x) => x.src).slice(0, 4);
+    const tabs = {};
+    tabs.ueb = statsHtml + recentHtml + bioHtml + injHtml + newsTeaser + loading;
+
+    // ---- Statistik ----
+    const tables = statTables(ov, soccer);
+    if (tables) tabs.stat = section('Statistik', tables);
+
+    // ---- Spiele ----
+    if (glData) tabs.spiele = section(`Spiele${glData.list[0]?.meta?.leagueShortName ? ` <span class="muted">· ${ctx.esc(glData.list[0].meta.leagueShortName)}</span>` : ''}`, formStrip(glData) + gamelogTable(glData, soccer));
+
+    // ---- Medien ----
+    const vids = (raw?.videos || []).map((v) => ({ v, src: v.links?.source?.HD?.href || v.links?.source?.href })).filter((x) => x.src).slice(0, 6);
     const vidHtml = vids.length ? section('Videos', `<div class="pf-vids">${vids.map(({ v, src }) => `
         <div class="pf-vid">
           <div class="gc-video-frame" data-video-src="${ctx.esc(src)}">${v.thumbnail ? `<img src="${ctx.esc(v.thumbnail)}" alt="" loading="lazy">` : ''}<span class="gc-video-play">▶</span></div>
           <div class="pf-vid-t">${ctx.esc(v.headline || v.title || '')}</div>
         </div>`).join('')}</div>`) : '';
+    const newsHtml = pl.news.length ? section('News', `<div class="pf-news-list">${pl.news.map(newsRow).join('')}</div>`) : '';
+    if (vidHtml || newsHtml) tabs.medien = newsHtml + vidHtml;
 
-    const newsHtml = pl.news.length ? section('News', `<div class="pf-news-list">${pl.news.map((n, i) => {
-      const img = (n.images || []).find((x) => x.url)?.url;
-      const when = fmtDate(n.published, { day: '2-digit', month: '2-digit', year: 'numeric' });
-      return `<button type="button" class="pf-news" data-pf-news="${i}">
-        ${img ? `<img src="${ctx.esc(img)}" alt="" loading="lazy">` : '<span class="pf-news-ph"></span>'}
-        <span class="pf-news-t">${ctx.esc(n.headline)}<small>${n.type === 'Media' ? '▶ Video · ' : ''}${ctx.esc(when)}</small></span>
-      </button>`;
-    }).join('')}</div>`) : '';
-
+    // ---- Karriere ----
     const history = (bio?.teamHistory || []).filter((t) => t.displayName);
-    const histHtml = history.length ? section('Stationen', history.map((t) => {
-      const seasons = String(t.seasons || '').replace(/-CURRENT/i, ' – heute').replace(/(\d{4})-(\d{4})/g, (_, x, y) => (x === y ? x : `${x}–${y}`));
-      return `<div class="gc-row pf-hist">
-        <span class="pf-hist-n">${t.logo ? `<img src="${ctx.esc(t.logo)}" alt="" loading="lazy">` : ''}${ctx.esc(t.displayName)}</span>
-        <span class="muted">${ctx.esc(seasons)}</span>
-        <span class="muted">${t.seasonCount ? `${ctx.esc(t.seasonCount)} Saisons` : ''}</span>
-      </div>`;
-    }).join('')) : '';
+    if (history.length) {
+      tabs.karriere = section('Stationen', history.map((t) => {
+        const seasons = String(t.seasons || '').replace(/-CURRENT/i, ' – heute').replace(/(\d{4})-(\d{4})/g, (_, x, y) => (x === y ? x : `${x}–${y}`));
+        return `<div class="gc-row pf-hist">
+          <span class="pf-hist-n">${t.logo ? `<img src="${ctx.esc(t.logo)}" alt="" loading="lazy">` : ''}${ctx.esc(t.displayName)}</span>
+          <span class="muted">${ctx.esc(seasons)}</span>
+          <span class="muted">${t.seasonCount ? `${ctx.esc(t.seasonCount)} Saisons` : ''}</span>
+        </div>`;
+      }).join(''));
+    }
 
-    const mates = (raw?.playerSwitcher?.athletes || []).filter((p) => p.id && p.id !== a.id).slice(0, 14);
-    const mateHtml = mates.length ? section('Aus dem Kader', `<div class="pf-roster">${mates.map((p) => `
+    // ---- Kader ----
+    const mates = (raw?.playerSwitcher?.athletes || []).filter((p) => p.id && p.id !== a.id).slice(0, 30);
+    if (mates.length) {
+      tabs.kader = section(`Kader${teamName ? ` <span class="muted">· ${ctx.esc(teamName)}</span>` : ''}`, `<div class="pf-roster">${mates.map((p) => `
         <button type="button" class="pf-rp" data-player-id="${ctx.esc(p.id)}">
           ${p.headshot?.href ? `<img src="${ctx.esc(p.headshot.href)}" alt="" loading="lazy">` : '<span class="pf-rp-ph"></span>'}
           <span class="pf-rp-num">${ctx.esc(String(p.jersey || p.displayJersey || '').replace('#', ''))}</span>
           <span class="pf-rp-name">${ctx.esc(p.displayName || '')}<small>${ctx.esc(POS_DE[p.position?.displayName] || p.position?.abbreviation || '')}</small></span>
-        </button>`).join('')}</div>`) : '';
+        </button>`).join('')}</div>` + (a.team?.id ? `<button type="button" class="pf-more pf-more-block" data-team-id="${ctx.esc(a.team.id)}">Ganzes Team ansehen ›</button>` : ''));
+    }
 
-    const loading = pl.loadingExtras ? '<div class="gc-loading"><div class="skeleton"></div><div class="skeleton"></div></div>' : '';
-    const all = bioHtml + statsHtml + injHtml + tableHtml + glHtml + vidHtml + newsHtml + histHtml + mateHtml;
-    $body.innerHTML = all ? all + loading : (loading || '<div class="gc-empty">Für diesen Spieler liegen keine weiteren Daten vor.</div>');
+    const LABELS = { ueb: 'Übersicht', stat: 'Statistik', spiele: 'Spiele', medien: 'Medien', karriere: 'Karriere', kader: 'Kader' };
+    const keys = TAB_ORDER.filter((k) => tabs[k]);
+    if (!pl.tab || !keys.includes(pl.tab)) pl.tab = 'ueb';
+    $tabs.innerHTML = keys.length > 1 ? keys.map((k) => `<button type="button" role="tab" class="gc-tab${k === pl.tab ? ' active' : ''}" aria-selected="${k === pl.tab}" data-pf-tab="${k}">${LABELS[k]}</button>`).join('') : '';
+    const html = tabs[pl.tab];
+    $body.innerHTML = html && html.replace(loading, '').trim() ? html : (loading || '<div class="gc-empty">Für diesen Spieler liegen keine weiteren Daten vor.</div>');
   }
 
   // ---------- Team-Ansicht ----------
@@ -350,7 +418,7 @@
       const away = (nc?.competitors || []).find((c) => c.homeAway === 'away');
       const fmt = new Intl.DateTimeFormat('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(next.date));
       const homeId = home?.team?.id || home?.id, awayId = away?.team?.id || away?.id;
-      nextHtml = section('Nächstes Spiel', `<div class="gc-row">
+      nextHtml = section('Nächstes Spiel', `<div class="gc-row"${next.id ? ` data-pf-game="${ctx.esc(next.id)}" style="cursor:pointer"` : ''}>
         <span>${ctx.esc(fmt)} Uhr</span>
         <span>${awayId ? `<span class="gc-link" data-team-id="${ctx.esc(awayId)}">${ctx.esc(away?.team?.abbreviation || away?.abbreviation || '')}</span>` : ''} @ ${homeId ? `<span class="gc-link" data-team-id="${ctx.esc(homeId)}">${ctx.esc(home?.team?.abbreviation || home?.abbreviation || '')}</span>` : ''}</span>
       </div>`);

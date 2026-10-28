@@ -887,6 +887,30 @@ dialog.pf::backdrop { background: rgba(0, 0, 0, .7); backdrop-filter: blur(4px);
 .pf-hist { grid-template-columns: 1fr auto auto; }
 .pf-hist-n { display: flex; align-items: center; gap: 8px; font-weight: 600; }
 .pf-hist-n img { width: 22px; height: 22px; object-fit: contain; }
+/* Tabs im Spielerprofil */
+.pf-tabs { display: flex; gap: 2px; padding: 0 10px; background: var(--surface); border-bottom: 1px solid var(--border); overflow-x: auto; position: sticky; top: 0; z-index: 3; scrollbar-width: none; }
+.pf-tabs::-webkit-scrollbar { display: none; }
+.pf-tabs:empty { display: none; }
+.pf-tabs .gc-tab { flex-shrink: 0; }
+.pf-tabs .gc-tab.active { border-bottom-color: var(--pf-accent); }
+.pf-chev { color: var(--muted); font-size: 18px; font-weight: 400; line-height: 1; text-align: right; }
+.pf-team-chip .pf-chev { color: rgba(255, 255, 255, .7); margin-left: 4px; }
+.pf-sec h3 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pf-more { background: none; border: 0; color: var(--pf-accent); font-size: 12px; font-weight: 700; letter-spacing: 0; text-transform: none; padding: 2px 0; font-family: inherit; }
+.pf-more:hover { text-decoration: underline; }
+.pf-more-block { display: block; margin: 14px auto 0; font-size: 13px; }
+.pf-gl-lines { display: grid; gap: 6px; }
+.pf-gl-line { display: grid; grid-template-columns: 40px 22px 1fr auto 14px; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); text-align: left; font-size: 13px; }
+.pf-gl-line:hover, .pf-gl-row:hover td { border-color: var(--pf-accent); background: color-mix(in srgb, var(--pf-accent) 8%, var(--surface)); }
+.pf-gl-opp { display: flex; align-items: center; gap: 6px; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-gl-opp img { width: 18px; height: 18px; object-fit: contain; }
+.pf-gl-row { cursor: pointer; }
+.pf-gl-row td:first-child { background: var(--surface); }
+.pf-tbl td.pf-chev { width: 20px; padding-left: 0; }
+.pf-legend { margin-top: 8px; font-size: 12px; color: var(--muted); }
+.pf-legend summary { cursor: pointer; padding: 4px 0; }
+.pf-legend div { display: flex; flex-wrap: wrap; gap: 4px 14px; padding-top: 4px; }
+.pf-legend b { color: var(--text); }
 
 @media (max-width: 640px) {
   dialog.pf { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; border-radius: 0; border: 0; margin: 0; }
