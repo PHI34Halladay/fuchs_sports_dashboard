@@ -9,6 +9,8 @@
   let ctx = null; // { api, esc, fav: { get(teamId, league), toggle(teamId, league) } }
   let reqId = 0;
   let activeLeague = null; // { sport, league } – Kontext für verschachtelte Klicks (Team-Chip, nächstes Spiel)
+  let view = 'player'; // 'player' | 'team' – welche Ansicht gerade offen ist
+  let pt = null; // aktuell geöffnetes Team
   let pl = null; // aktuell geöffneter Spieler: { a, raw, ov, gl, bio, news, leagueName, loadingExtras }
 
   const dlg = document.createElement('dialog');
@@ -41,9 +43,12 @@
     const tabBtn = e.target.closest('[data-pf-tab]');
     if (tabBtn) {
       e.stopPropagation();
-      if (pl) { pl.tab = tabBtn.dataset.pfTab; renderPlayer(); $scroll.scrollTop = Math.min($scroll.scrollTop, $head.offsetHeight); }
+      const cur = view === 'team' ? pt : pl;
+      if (cur) { cur.tab = tabBtn.dataset.pfTab; (view === 'team' ? renderTeam : renderPlayer)(); $scroll.scrollTop = Math.min($scroll.scrollTop, $head.offsetHeight); }
       return;
     }
+    const tg = e.target.closest('[data-pf-toggle]');
+    if (tg) { e.stopPropagation(); if (pt) { pt.allGames = !pt.allGames; renderTeam(); } return; }
     // Video im Profil: Vorschaubild antippen → Abspielen direkt in der App
     const vf = e.target.closest('.gc-video-frame[data-video-src]');
     if (vf) {
@@ -54,8 +59,9 @@
     const nw = e.target.closest('[data-pf-news]');
     if (nw) {
       e.stopPropagation();
-      const item = pl?.news?.[+nw.dataset.pfNews];
-      if (item && window.Reader) window.Reader.open(item, { ...activeLeague, name: pl.leagueName });
+      const cur = view === 'team' ? pt : pl;
+      const item = cur?.news?.[+nw.dataset.pfNews];
+      if (item && window.Reader) window.Reader.open(item, { ...activeLeague, name: cur.leagueName });
       return;
     }
     const fs = e.target.closest('[data-pf-fav]');
@@ -128,7 +134,7 @@
     if (!ctx || !id) return;
     if (league) activeLeague = league;
     const myId = startLoad();
-    pl = null;
+    pl = null; pt = null; view = 'player';
     try {
       const data = await ctx.api('athlete', { id }, activeLeague);
       if (myId !== reqId) return;
@@ -152,13 +158,25 @@
     if (!ctx || !id) return;
     if (league) activeLeague = league;
     const myId = startLoad();
+    pl = null; pt = null; view = 'team';
     try {
       const [data, roster] = await Promise.all([
         ctx.api('team', { id }, activeLeague),
         ctx.api('roster', { id }, activeLeague).catch(() => null),
       ]);
       if (myId !== reqId) return;
-      renderTeam(data.team || {}, roster);
+      // Grunddaten + Kader sofort, Spielplan/Tabelle/News/Statistik laden danach nach
+      pt = { t: data.team || {}, roster, sc: null, stand: null, news: [], tstats: null, leagueName: data.team?.defaultLeague?.name || '', loadingExtras: true, tab: 'ueb', allGames: false };
+      renderTeam();
+      const extra = (type, params = {}) => ctx.api(type, params, activeLeague).catch(() => null);
+      const [sc, stand, news, tstats] = await Promise.all([
+        extra('schedule', { id }), extra('standings'), extra('news', { team: id, limit: '8' }), extra('teamstats', { id }),
+      ]);
+      if (myId !== reqId) return;
+      pt.sc = sc; pt.stand = stand; pt.tstats = tstats;
+      pt.news = (news?.articles || []).filter((n) => n.headline && n.id).slice(0, 8);
+      pt.loadingExtras = false;
+      renderTeam();
     } catch (e) {
       if (myId !== reqId) return;
       $body.innerHTML = `<div class="status error">Teamdaten konnten nicht geladen werden: ${ctx.esc(e.message)}</div>`;
@@ -388,64 +406,270 @@
     $body.innerHTML = html && html.replace(loading, '').trim() ? html : (loading || '<div class="gc-empty">Für diesen Spieler liegen keine weiteren Daten vor.</div>');
   }
 
+  const GROUP_DE = { offense: 'Offense', defense: 'Defense', specialTeam: 'Special Teams', centers: 'Center', forwards: 'Stürmer', defensemen: 'Verteidiger', goalies: 'Torhüter', pitchers: 'Pitcher', catchers: 'Catcher', infielders: 'Infield', outfielders: 'Outfield', designatedHitter: 'Designated Hitter' };
   // ---------- Team-Ansicht ----------
   const RECORD_LABELS = { total: 'Gesamt', home: 'Heim', road: 'Auswärts', away: 'Auswärts' };
+  const REC_STATS = { gamesPlayed: 'Spiele', wins: 'Siege', ties: 'Unentschieden', losses: 'Niederlagen', points: 'Punkte', pointDifferential: 'Differenz' };
+  const CAT_DE = { general: 'Allgemein', offensive: 'Angriff', defensive: 'Verteidigung', passing: 'Passspiel', rushing: 'Laufspiel', receiving: 'Passempfang', scoring: 'Punkte', goalkeeping: 'Torwart', kicking: 'Kicker', punting: 'Punter', returning: 'Returns', miscellaneous: 'Sonstiges', batting: 'Schlagen', pitching: 'Pitching', fielding: 'Feld', skating: 'Feldspieler', penalties: 'Strafen' };
+  const NOTE_DE = [[/champions league/i, 'Champions League'], [/europa league/i, 'Europa League'], [/conference league/i, 'Conference League'], [/relegation play/i, 'Relegation'], [/relegation/i, 'Abstieg'], [/promotion/i, 'Aufstieg'], [/playoff/i, 'Playoffs'], [/play-in/i, 'Play-in']];
+  const noteName = (n) => { for (const [re, de] of NOTE_DE) if (re.test(n)) return de; return n; };
+  const STAND_SUM = (s) => String(s || '').replace(/^(\d+)(?:st|nd|rd|th) in /, 'Platz $1 in ');
+  const dayDiff = (iso) => { const a = new Date(iso), n = new Date(); return Math.round((new Date(a.getFullYear(), a.getMonth(), a.getDate()) - new Date(n.getFullYear(), n.getMonth(), n.getDate())) / 864e5); };
+  const inDays = (iso) => { const d = dayDiff(iso); return d <= 0 ? 'heute' : d === 1 ? 'morgen' : `in ${d} Tagen`; };
+  const num = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
 
-  function renderTeam(t, roster) {
+  // Ein ESPN-Spiel (Spielplan oder nextEvent) aus Sicht des Teams auswerten
+  function parseEvent(e, teamId) {
+    const c = e.competitions?.[0];
+    if (!c) return null;
+    const comps = c.competitors || [];
+    const me = comps.find((x) => String(x.team?.id ?? x.id) === String(teamId));
+    const opp = comps.find((x) => x !== me);
+    if (!me || !opp) return null;
+    const st = e.status?.type || c.status?.type || {};
+    const sc = (x) => { const v = x?.score; return v == null ? '' : typeof v === 'object' ? (v.displayValue ?? v.value ?? '') : String(v); };
+    const my = sc(me), their = sc(opp);
+    const done = !!st.completed;
+    let res = null;
+    if (done) {
+      const a = num(my), b = num(their);
+      res = a != null && b != null ? (a > b ? 'W' : a < b ? 'L' : 'D') : me.winner ? 'W' : opp.winner ? 'L' : 'D';
+    }
+    return {
+      id: String(e.id), date: e.date, home: me.homeAway === 'home', done, live: st.state === 'in', res, my, their,
+      opp: opp.team || {}, venue: c.venue?.fullName || '', city: c.venue?.address?.city || '',
+      slug: e.league?.slug || '', clock: e.status?.displayClock || '', detail: st.shortDetail || '',
+    };
+  }
+
+  function parseSchedule(sc, teamId) {
+    const list = (sc?.events || []).map((e) => parseEvent(e, teamId)).filter(Boolean);
+    const past = list.filter((g) => g.done).sort((x, y) => new Date(y.date) - new Date(x.date));
+    const next = list.filter((g) => !g.done).sort((x, y) => new Date(x.date) - new Date(y.date));
+    return { past, next };
+  }
+
+  const oppLogo = (o) => o.logos?.find((l) => (l.rel || []).includes('default'))?.href || o.logos?.[0]?.href || o.logo || '';
+  const gameAttr = (g) => `data-pf-game="${ctx.esc(g.id)}"${g.slug ? ` data-pf-league="${ctx.esc(g.slug)}"` : ''}`;
+
+  // Antippbare Spielzeile im Team-Profil (Ergebnis oder Termin)
+  function teamGameLine(g) {
+    const d = fmtDate(g.date, { weekday: 'short', day: '2-digit', month: '2-digit' });
+    const tm = fmtDate(g.date, { hour: '2-digit', minute: '2-digit' });
+    const right = g.done ? `${g.my}:${g.their}` : g.live ? `<span class="pf-live">LIVE ${ctx.esc(g.my)}:${ctx.esc(g.their)}</span>` : `${tm} Uhr`;
+    const badge = g.done ? resBadge(g.res) : g.live ? '<span class="pf-res pf-res-live">●</span>' : '<span class="pf-res"></span>';
+    const o = g.opp;
+    const logo = oppLogo(o);
+    return `<button type="button" class="pf-gl-line pf-tg" ${gameAttr(g)}>
+      <span class="pf-gl-date">${ctx.esc(d)}</span>${badge}
+      <span class="pf-gl-opp"><span class="muted">${g.home ? 'Heim' : 'Ausw.'}</span> ${logo ? `<img src="${ctx.esc(logo)}" alt="" loading="lazy">` : ''}${ctx.esc(o.displayName || o.shortDisplayName || o.abbreviation || '')}</span>
+      <span class="pf-gl-score">${right}</span><span class="pf-chev">›</span>
+    </button>`;
+  }
+
+  function nextGameCard(g, team) {
+    const o = g.opp;
+    const logo = oppLogo(o);
+    const myLogo = bestLogo(team.logos, team.logo);
+    const meName = team.shortDisplayName || team.displayName || '';
+    const oppName = o.shortDisplayName || o.displayName || '';
+    const where = [g.venue, g.city && g.city !== g.venue ? g.city : ''].filter(Boolean).join(', ');
+    return `<button type="button" class="pf-next" ${gameAttr(g)}>
+      <div class="pf-next-when"><b>${ctx.esc(fmtDate(g.date, { weekday: 'long', day: '2-digit', month: 'long' }))}</b> · ${ctx.esc(fmtDate(g.date, { hour: '2-digit', minute: '2-digit' }))} Uhr <span class="pf-next-in">${ctx.esc(inDays(g.date))}</span></div>
+      <div class="pf-next-vs">
+        <span class="pf-next-t">${myLogo ? `<img src="${ctx.esc(myLogo)}" alt="">` : ''}<span>${ctx.esc(meName)}</span></span>
+        <span class="pf-next-sep">${g.home ? 'vs' : '@'}</span>
+        <span class="pf-next-t">${logo ? `<img src="${ctx.esc(logo)}" alt="">` : ''}<span>${ctx.esc(oppName)}</span></span>
+      </div>
+      <div class="pf-next-foot muted">${ctx.esc(g.home ? 'Heimspiel' : 'Auswärtsspiel')}${where ? ` · ${ctx.esc(where)}` : ''}<span class="pf-chev">›</span></div>
+    </button>`;
+  }
+
+  // ---- Tabelle ----
+  function collectGroups(node, out = []) {
+    if (!node) return out;
+    if (node.standings?.entries) out.push({ name: node.name || node.standings.displayName || '', entries: node.standings.entries });
+    (node.children || []).forEach((c) => collectGroups(c, out));
+    return out;
+  }
+  const statOf = (e, name) => (e.stats || []).find((s) => s.name === name);
+  function standingsFor(data, teamId) {
+    const groups = collectGroups(data);
+    if (!groups.length) return null;
+    const g = groups.find((x) => x.entries.some((e) => String(e.team?.id) === String(teamId)));
+    if (!g) return null;
+    const rows = g.entries.map((e, i) => ({ e, rank: num(statOf(e, 'rank')?.value) || i + 1 })).sort((a, b) => a.rank - b.rank);
+    return { name: g.name, rows };
+  }
+  function standCols(sport, rows) {
+    const cols = sport === 'soccer'
+      ? [['gamesPlayed', 'Sp'], ['wins', 'S'], ['ties', 'U'], ['losses', 'N'], ['_goals', 'Tore'], ['pointDifferential', '+/−'], ['points', 'Pkt']]
+      : sport === 'hockey'
+        ? [['gamesPlayed', 'Sp'], ['wins', 'S'], ['losses', 'N'], ['otLosses', 'OTN'], ['points', 'Pkt']]
+        : [['wins', 'S'], ['losses', 'N'], ['winPercent', 'PCT'], ['gamesBehind', 'GB']];
+    return cols.filter(([n]) => n === '_goals' ? rows.some(({ e }) => statOf(e, 'pointsFor')) : rows.some(({ e }) => statOf(e, n)));
+  }
+  function standingsTable(st, teamId, sport, slice) {
+    let rows = st.rows;
+    let cut = false;
+    if (slice) {
+      const i = Math.max(0, rows.findIndex(({ e }) => String(e.team?.id) === String(teamId)));
+      const from = Math.max(0, Math.min(i - 2, rows.length - 5));
+      rows = rows.slice(from, from + 5);
+      cut = rows.length < st.rows.length;
+    }
+    const cols = standCols(sport, st.rows);
+    const val = (e, n) => {
+      if (n === '_goals') return `${statOf(e, 'pointsFor')?.displayValue ?? '–'}:${statOf(e, 'pointsAgainst')?.displayValue ?? '–'}`;
+      return statOf(e, n)?.displayValue ?? '–';
+    };
+    const hex = (c) => (c ? (String(c).startsWith('#') ? c : `#${c}`) : '');
+    const body = rows.map(({ e, rank }) => {
+      const t = e.team || {};
+      const me = String(t.id) === String(teamId);
+      const zone = e.note?.color ? ` style="box-shadow: inset 3px 0 0 ${ctx.esc(hex(e.note.color))}"` : '';
+      const logo = oppLogo(t);
+      return `<tr class="${me ? 'pf-me' : ''}"><td${zone}><span class="pf-rk">${rank}</span>${logo ? `<img src="${ctx.esc(logo)}" alt="" loading="lazy">` : ''}<span class="gc-link" data-team-id="${ctx.esc(t.id)}">${ctx.esc(t.shortDisplayName || t.displayName || '')}</span></td>${cols.map(([n]) => `<td>${ctx.esc(val(e, n))}</td>`).join('')}</tr>`;
+    }).join('');
+    const notes = [...new Map(st.rows.filter(({ e }) => e.note?.description).map(({ e }) => [e.note.description, e.note.color])).entries()];
+    const legend = !slice && notes.length ? `<div class="pf-zones">${notes.map(([d, c]) => `<span><i style="background:${ctx.esc(hex(c))}"></i>${ctx.esc(noteName(d))}</span>`).join('')}</div>` : '';
+    return `<div class="table-wrap"><table class="pf-tbl pf-st"><thead><tr><th>Team</th>${cols.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>${legend}${cut ? '' : ''}`;
+  }
+
+  // ---- Kader ----
+  const POS_GROUP_SOCCER = { Goalkeeper: ['Torhüter', 0], Defender: ['Abwehr', 1], Midfielder: ['Mittelfeld', 2], Forward: ['Sturm', 3], Attacker: ['Sturm', 3] };
+  function rosterEntries(r, soccer) {
+    const raw = r?.athletes || [];
+    if (!raw.length) return [];
+    if (raw[0]?.items) return raw.map((g) => ({ name: GROUP_DE[g.position] || g.position || '', order: 0, list: g.items || [] }));
+    const map = new Map();
+    for (const a of raw) {
+      const pn = a.position?.displayName || a.position?.name || '';
+      const [name, order] = soccer ? (POS_GROUP_SOCCER[pn] || [pn || 'Weitere', 9]) : [pn, 0];
+      if (!map.has(name)) map.set(name, { name: soccer ? name : '', order, list: [] });
+      map.get(name).list.push(a);
+    }
+    const groups = [...map.values()].sort((x, y) => x.order - y.order);
+    // Nicht-Fußball: eine Gruppe pro Position (Guard/Forward/Center …), wenn es mehrere gibt
+    if (!soccer && groups.length > 1) groups.forEach((g, i) => { g.name = [...map.keys()][i]; });
+    return groups;
+  }
+  const isHurt = (a) => (a.injuries || []).length > 0 || (a.status?.type && a.status.type !== 'active');
+  const hurtText = (a) => { const i = (a.injuries || [])[0]; return i?.status || i?.details?.type || a.status?.name || 'Verletzt'; };
+
+  function rosterTab(roster, soccer) {
+    const groups = rosterEntries(roster, soccer);
+    if (!groups.length) return '';
+    const body = groups.map((g) => {
+      const list = g.list.slice().sort((a, b) => (+a.jersey || 99) - (+b.jersey || 99));
+      return `${g.name ? `<div class="gc-box-group">${ctx.esc(g.name)} <span class="muted">· ${list.length}</span></div>` : ''}<div class="pf-roster">${list.map((a) => {
+        const meta = [a.position?.abbreviation, a.age ? `${a.age} J.` : ''].filter(Boolean).join(' · ');
+        return `<button type="button" class="pf-rp" data-player-id="${ctx.esc(a.id)}">
+          ${a.headshot?.href ? `<img src="${ctx.esc(a.headshot.href)}" alt="" loading="lazy">` : '<span class="pf-rp-ph"></span>'}
+          <span class="pf-rp-num">${ctx.esc(a.jersey || '')}</span>
+          <span class="pf-rp-name">${ctx.esc(a.displayName || a.fullName || '')}${a.flag?.href ? ` <img class="pf-flag" src="${ctx.esc(a.flag.href)}" alt="">` : ''}<small>${ctx.esc(meta)}${isHurt(a) ? ` <b class="pf-hurt">● ${ctx.esc(hurtText(a))}</b>` : ''}</small></span>
+        </button>`;
+      }).join('')}</div>`;
+    }).join('');
+    const count = groups.reduce((n, g) => n + g.list.length, 0);
+    return section(`Kader <span class="muted">· ${count} Spieler</span>`, body);
+  }
+
+  function renderTeam() {
+    const { t, roster, sc, stand, news, tstats } = pt;
+    const soccer = activeLeague?.sport === 'soccer';
     setAccent(t.color, t.alternateColor);
     const logo = bestLogo(t.logos, t.logo);
     const favOn = ctx.fav?.get(t.id, activeLeague);
     const favBtn = favOn == null ? '' : `<button type="button" class="pf-fav${favOn ? ' on' : ''}" data-pf-fav="${ctx.esc(t.id)}">${favOn ? '★ Favorit' : '☆ Als Favorit'}</button>`;
+    const sched = sc ? parseSchedule(sc, t.id) : { past: [], next: [] };
+    const nextEv = sched.next[0] || (t.nextEvent?.[0] ? parseEvent(t.nextEvent[0], t.id) : null);
+    const venue = nextEv?.home ? nextEv.venue : '';
+    const totalRec = (t.record?.items || []).find((i) => i.type === 'total')?.summary;
+    const leagueName = t.defaultLeague?.name || pt.leagueName || '';
 
     $head.innerHTML = `
       <div class="pf-team-head">
         ${window.LogoPref.img(t.id, logo, 'pf-team-logo')}
         <div class="pf-info">
           <div class="pf-name">${ctx.esc(t.displayName || t.name || '')}</div>
-          <div class="pf-sub">${ctx.esc(t.standingSummary || '')}</div>
+          <div class="pf-sub">${ctx.esc(STAND_SUM(t.standingSummary || ''))}</div>
+          <div class="pf-sub pf-chips">${leagueName ? `<span class="pf-chip">${ctx.esc(leagueName)}</span>` : ''}${totalRec && totalRec !== '0-0' && totalRec !== '0-0-0' ? `<span class="pf-chip">Bilanz ${ctx.esc(totalRec)}</span>` : ''}${venue ? `<span class="pf-chip">🏟 ${ctx.esc(venue)}</span>` : ''}</div>
           ${favBtn}
         </div>
       </div>`;
 
-    const recRows = (t.record?.items || []).map((i) => [RECORD_LABELS[i.type] || i.type, i.summary]).filter(([, v]) => v);
-    const recHtml = recRows.length ? section('Bilanz', `<dl class="gc-info pf-bio">${recRows.map(([k, v]) => `<dt>${ctx.esc(k)}</dt><dd>${ctx.esc(v)}</dd>`).join('')}</dl>`) : '';
+    const loading = pt.loadingExtras ? '<div class="gc-loading"><div class="skeleton"></div><div class="skeleton"></div></div>' : '';
+    const st = stand ? standingsFor(stand, t.id) : null;
+    const tabs = {};
 
-    const next = (t.nextEvent || [])[0];
-    let nextHtml = '';
-    if (next) {
-      const nc = next.competitions?.[0];
-      const home = (nc?.competitors || []).find((c) => c.homeAway === 'home');
-      const away = (nc?.competitors || []).find((c) => c.homeAway === 'away');
-      const fmt = new Intl.DateTimeFormat('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(next.date));
-      const homeId = home?.team?.id || home?.id, awayId = away?.team?.id || away?.id;
-      nextHtml = section('Nächstes Spiel', `<div class="gc-row"${next.id ? ` data-pf-game="${ctx.esc(next.id)}" style="cursor:pointer"` : ''}>
-        <span>${ctx.esc(fmt)} Uhr</span>
-        <span>${awayId ? `<span class="gc-link" data-team-id="${ctx.esc(awayId)}">${ctx.esc(away?.team?.abbreviation || away?.abbreviation || '')}</span>` : ''} @ ${homeId ? `<span class="gc-link" data-team-id="${ctx.esc(homeId)}">${ctx.esc(home?.team?.abbreviation || home?.abbreviation || '')}</span>` : ''}</span>
-      </div>`);
+    // ---- Übersicht ----
+    const nextHtml = nextEv ? section('Nächstes Spiel', nextGameCard(nextEv, t)) : '';
+
+    const totalStats = (t.record?.items || []).find((i) => i.type === 'total')?.stats || [];
+    const sv = (n) => totalStats.find((s) => s.name === n)?.value;
+    const played = num(sv('gamesPlayed')) || 0;
+    const tiles = [];
+    if (played > 0) {
+      for (const n of ['gamesPlayed', 'wins', 'ties', 'losses', 'points']) {
+        if (sv(n) == null || (n === 'ties' && !num(sv(n)) && !soccer)) continue;
+        if (n === 'points' && !soccer && activeLeague?.sport !== 'hockey') continue;
+        tiles.push([REC_STATS[n], String(Math.round(num(sv(n)) ?? 0))]);
+      }
+      if (sv('pointsFor') != null && soccer) tiles.splice(4, 0, ['Tore', `${Math.round(num(sv('pointsFor')))}:${Math.round(num(sv('pointsAgainst')) || 0)}`]);
+    }
+    const recRows = (t.record?.items || []).filter((i) => i.type !== 'total').map((i) => [RECORD_LABELS[i.type] || i.type, i.summary]).filter(([, v]) => v && !/^0(-0)+$/.test(v));
+    const recHtml = tiles.length || recRows.length ? section('Bilanz', (tiles.length ? `<div class="pf-stats">${tiles.map(([k, v]) => `<div class="pf-stat"><div class="pf-stat-val">${ctx.esc(v)}</div><div class="pf-stat-label">${ctx.esc(k)}</div></div>`).join('')}</div>` : '') + (recRows.length ? `<dl class="gc-info pf-bio" style="margin-top:10px">${recRows.map(([k, v]) => `<dt>${ctx.esc(k)}</dt><dd>${ctx.esc(v)}</dd>`).join('')}</dl>` : '')) : '';
+
+    const formHtml = sched.past.length ? section(`Letzte Ergebnisse <button type="button" class="pf-more" data-pf-tab="spiele">Alle ›</button>`,
+      `<div class="pf-form">${sched.past.slice(0, 5).map((g) => resBadge(g.res)).join('')}<span class="muted">Form (neueste zuerst)</span></div><div class="pf-gl-lines">${sched.past.slice(0, 3).map(teamGameLine).join('')}</div>`) : '';
+
+    const standHtml = st ? section(`Tabelle <span class="muted">· ${ctx.esc(st.name || leagueName)}</span> <button type="button" class="pf-more" data-pf-tab="tabelle">Komplett ›</button>`, standingsTable(st, t.id, activeLeague?.sport, true)) : '';
+
+    const hurt = (roster?.athletes || []).flatMap((x) => (x.items ? x.items : [x])).filter(isHurt);
+    const hurtHtml = hurt.length ? section(`Ausfälle <span class="muted">· ${hurt.length}</span>`, hurt.slice(0, 8).map((a) => `<div class="gc-row"><span class="gc-link" data-player-id="${ctx.esc(a.id)}">${ctx.esc(a.displayName || a.fullName || '')}</span><span class="muted">${ctx.esc(a.position?.abbreviation || '')}</span><span class="pf-hurt">${ctx.esc(hurtText(a))}</span></div>`).join('')) : '';
+
+    const coach = roster?.coach?.[0];
+    const coachHtml = coach ? section('Trainer', `<div class="gc-row"><span>${ctx.esc([coach.firstName, coach.lastName].filter(Boolean).join(' '))}</span><span></span><span class="muted">${coach.experience != null ? `${ctx.esc(coach.experience)} Jahre Erfahrung` : ''}</span></div>`) : '';
+
+    const newsTeaser = news[0] ? section(`Neueste News <button type="button" class="pf-more" data-pf-tab="news">Mehr ›</button>`, newsRow(news[0], 0)) : '';
+    tabs.ueb = nextHtml + recHtml + formHtml + standHtml + hurtHtml + coachHtml + newsTeaser + loading;
+
+    // ---- Spiele ----
+    if (sched.past.length || sched.next.length) {
+      const showAll = !!pt.allGames;
+      const nxt = showAll ? sched.next : sched.next.slice(0, 5);
+      const pst = showAll ? sched.past : sched.past.slice(0, 10);
+      const more = (sched.next.length > 5 || sched.past.length > 10) ? `<button type="button" class="pf-more pf-more-block" data-pf-toggle="games">${showAll ? 'Weniger anzeigen' : `Alle ${sched.next.length + sched.past.length} Spiele anzeigen`} ›</button>` : '';
+      tabs.spiele = (nxt.length ? section('Termine', `<div class="pf-gl-lines">${nxt.map(teamGameLine).join('')}</div>`) : '')
+        + (pst.length ? section('Ergebnisse', `<div class="pf-form">${sched.past.slice(0, 5).map((g) => resBadge(g.res)).join('')}<span class="muted">Form (neueste zuerst)</span></div><div class="pf-gl-lines">${pst.map(teamGameLine).join('')}</div>`) : '')
+        + more + '<div class="gc-note">Spiel antippen für Aufstellung, Verlauf und Boxscore</div>';
     }
 
-    $body.innerHTML = (recHtml + nextHtml + rosterHtml(roster)) || '<div class="gc-empty">Für dieses Team liegen keine weiteren Daten vor.</div>';
+    // ---- Tabelle ----
+    if (st) tabs.tabelle = section(`Tabelle <span class="muted">· ${ctx.esc(st.name || leagueName)}</span>`, standingsTable(st, t.id, activeLeague?.sport, false));
 
-  }
+    // ---- Kader ----
+    const rt = rosterTab(roster, soccer);
+    if (rt) tabs.kader = rt;
 
-  // Kader: ESPN liefert entweder eine flache Spielerliste (NBA, Fußball) oder nach
-  // Positionsgruppen geordnet (NFL, NHL, MLB: [{ position, items: [...] }])
-  const GROUP_DE = { offense: 'Offense', defense: 'Defense', specialTeam: 'Special Teams', centers: 'Center', forwards: 'Stürmer', defensemen: 'Verteidiger', goalies: 'Torhüter', pitchers: 'Pitcher', catchers: 'Catcher', infielders: 'Infield', outfielders: 'Outfield', designatedHitter: 'Designated Hitter' };
-  function rosterHtml(r) {
-    const raw = r?.athletes || [];
-    if (!raw.length) return '';
-    const groups = raw[0]?.items ? raw.map((g) => ({ name: GROUP_DE[g.position] || g.position || '', list: g.items || [] })) : [{ name: '', list: raw }];
-    const posOrder = { G: 0, GK: 0, D: 1, M: 2, F: 3 };
-    const body = groups.map((g) => {
-      const list = g.list.slice().sort((a, b) => (posOrder[a.position?.abbreviation] ?? 5) - (posOrder[b.position?.abbreviation] ?? 5) || (+a.jersey || 99) - (+b.jersey || 99));
-      return `${g.name ? `<div class="gc-box-group">${ctx.esc(g.name)}</div>` : ''}<div class="pf-roster">${list.map((a) => `
-        <button type="button" class="pf-rp" data-player-id="${ctx.esc(a.id)}">
-          ${a.headshot?.href ? `<img src="${ctx.esc(a.headshot.href)}" alt="" loading="lazy">` : '<span class="pf-rp-ph"></span>'}
-          <span class="pf-rp-num">${ctx.esc(a.jersey || '')}</span>
-          <span class="pf-rp-name">${ctx.esc(a.displayName || a.fullName || '')}<small>${ctx.esc(a.position?.abbreviation || '')}</small></span>
-        </button>`).join('')}</div>`;
-    }).join('');
-    return section(`Kader <span class="muted">· ${groups.reduce((n, g) => n + g.list.length, 0)} Spieler</span>`, body);
+    // ---- Statistik ----
+    const cats = (tstats?.results?.stats?.categories || tstats?.stats?.categories || []).filter((c) => (c.stats || []).length);
+    if (cats.length) {
+      tabs.stat = cats.map((c) => section(ctx.esc(CAT_DE[c.name] || c.displayName || c.name), `<div class="pf-stats">${c.stats.filter((s) => s.displayValue != null && s.displayValue !== '').map((s) => `
+        <div class="pf-stat" title="${ctx.esc(s.description || s.displayName || '')}"><div class="pf-stat-val">${ctx.esc(s.displayValue)}</div><div class="pf-stat-label">${ctx.esc(s.shortDisplayName || s.abbreviation || s.displayName)}</div></div>`).join('')}</div>`)).join('')
+        + `<div class="gc-note">${ctx.esc(tstats?.requestedSeason?.displayName || tstats?.season?.displayName || '')} · Werte von ESPN</div>`;
+    }
+
+    // ---- News ----
+    if (news.length) tabs.news = section('News', `<div class="pf-news-list">${news.map(newsRow).join('')}</div>`);
+
+    const LABELS = { ueb: 'Übersicht', spiele: 'Spiele', tabelle: 'Tabelle', kader: 'Kader', stat: 'Statistik', news: 'News' };
+    const keys = ['ueb', 'spiele', 'tabelle', 'kader', 'stat', 'news'].filter((k) => tabs[k]);
+    if (!pt.tab || !keys.includes(pt.tab)) pt.tab = 'ueb';
+    $tabs.innerHTML = keys.length > 1 ? keys.map((k) => `<button type="button" role="tab" class="gc-tab${k === pt.tab ? ' active' : ''}" aria-selected="${k === pt.tab}" data-pf-tab="${k}">${LABELS[k]}</button>`).join('') : '';
+    const html = tabs[pt.tab];
+    $body.innerHTML = html && html.replace(loading, '').trim() ? html : (loading || '<div class="gc-empty">Für dieses Team liegen keine weiteren Daten vor.</div>');
   }
 
   window.Profile = {

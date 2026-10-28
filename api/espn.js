@@ -21,6 +21,9 @@ const CACHE = {
   overview: 300,
   gamelog: 600,
   bio: 86400,
+  // Team-Profil: Spielplan und Teamstatistik
+  schedule: 300,
+  teamstats: 3600,
   roster: 3600,
   search: 600,
   article: 3600,
@@ -78,6 +81,8 @@ function buildUrl(q) {
     case 'news':
       url = `${BASE_SITE}/${sport}/${league}/news`;
       params.set('limit', q.limit && RE_NUM.test(q.limit) ? q.limit : '25');
+      // team: nur Meldungen zu einem Team (Team-Profil)
+      if (q.team && RE_ID.test(q.team)) params.set('team', q.team);
       break;
     case 'teams':
       url = `${BASE_SITE}/${sport}/${league}/teams`;
@@ -87,6 +92,14 @@ function buildUrl(q) {
       if (!RE_ID.test(q.id || '')) throw new Error('Ungültige Team-ID');
       url = `${BASE_SITE}/${sport}/${league}/teams/${q.id}`;
       params.set('enable', 'nextEvent');
+      break;
+    case 'schedule':
+      if (!RE_ID.test(q.id || '')) throw new Error('Ungültige Team-ID');
+      url = `${BASE_SITE}/${sport}/${league}/teams/${q.id}/schedule`;
+      break;
+    case 'teamstats':
+      if (!RE_ID.test(q.id || '')) throw new Error('Ungültige Team-ID');
+      url = `${BASE_SITE}/${sport}/${league}/teams/${q.id}/statistics`;
       break;
     case 'roster':
       if (!RE_ID.test(q.id || '')) throw new Error('Ungültige Team-ID');

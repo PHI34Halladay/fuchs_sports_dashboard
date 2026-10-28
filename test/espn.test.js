@@ -41,3 +41,12 @@ test('ESPN-Proxy begrenzt Datumsbereiche auf 14 Tage und lehnt umgekehrte ab', (
   assert.deepStrictEqual(expandRange('20261001-20261015'), []);
   assert.deepStrictEqual(expandRange('20261030-20261027'), []);
 });
+
+test('ESPN-Proxy baut die Team-Endpunkte (schedule, teamstats) und Team-News', () => {
+  assert.match(buildUrl({ type: 'schedule', sport: 'soccer', league: 'ger.1', id: '132' }), /\/teams\/132\/schedule$/);
+  assert.match(buildUrl({ type: 'teamstats', sport: 'basketball', league: 'nba', id: '13' }), /\/teams\/13\/statistics$/);
+  assert.match(buildUrl({ type: 'news', sport: 'soccer', league: 'ger.1', team: '132' }), /news\?.*team=132/);
+  assert.throws(() => buildUrl({ type: 'schedule', sport: 'soccer', league: 'ger.1', id: 'x' }));
+  // ungültige Team-ID bei News wird ignoriert statt durchgereicht
+  assert.doesNotMatch(buildUrl({ type: 'news', sport: 'soccer', league: 'ger.1', team: '../x' }), /team=/);
+});
