@@ -254,6 +254,32 @@ async function handler(req, res) {
       res.status(200).json({ api: al.api, mine: all[al.api] || null, all });
       return;
     }
+    if (q.debug === 'probe') { // Diagnose: welche Abfragen liefern Spiele außerhalb der Hauptrunde?
+      const tries = [
+        ['schedule', { leagueId: al.api, seasonId: app.SEASON_ID }],
+        ['schedule', { seasonId: app.SEASON_ID, leagueId: al.api, roundId: 0 }],
+        ['schedule', { roundId: 61, seasonId: app.SEASON_ID }],
+        ['schedule', { roundId: 64, seasonId: app.SEASON_ID }],
+        ['schedule', { roundId: 65, seasonId: app.SEASON_ID }],
+        ['schedule', { roundId: 66, seasonId: app.SEASON_ID }],
+        ['schedule', { roundId: 67, seasonId: app.SEASON_ID }],
+        ['schedule', { roundId: 68, seasonId: app.SEASON_ID }],
+        ['schedule', { roundId: 69, seasonId: app.SEASON_ID }],
+        ['schedule', { roundId: 62 }],
+      ];
+      const out = [];
+      for (const [r, p] of tries) {
+        try {
+          const j = await getApp(r, p, 30);
+          const ms = Object.values(j?.schedule?.matches || {});
+          const dates = ms.map((m) => String(m.dateTime || '').slice(0, 10)).sort();
+          const rid = [...new Set(ms.map((m) => m.roundId))];
+          out.push({ r, p, keys: Object.keys(j || {}), n: ms.length, from: dates[0], to: dates[dates.length - 1], rid, nov10: ms.filter((m) => String(m.dateTime).startsWith('2026-11-1')).length });
+        } catch (e) { out.push({ r, p, err: String(e.message) }); }
+      }
+      res.status(200).json(out);
+      return;
+    }
     if (q.src === 'web' && lg) { await handleGames(lg, key, date, res); return; } // Diagnose: Hockeyweb-Seiten statt App-API
     if (q.type === 'match' || q.type === 'news') {
       if (q.type === 'match') await handleMatchApp(al, key, q, res); else await handleNewsApp(al, key, res);
