@@ -157,6 +157,8 @@ async function handleRange(q, res) {
       events.push(...evs);
     }
     res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=900');
+    // daysOnly=1: nur die Spieltage (spart bei Wochenblöcken der Kalender-Abfragen ~250 KB je Antwort)
+    if (q.daysOnly) { res.status(200).json({ days: gameDays, range: q.dates }); return; }
     res.status(200).json({ leagues: parts[0].data.leagues, events, days: gameDays, range: q.dates });
   } catch (e) {
     res.status(e.status || 502).json({ error: e.message || 'ESPN nicht erreichbar' });

@@ -376,7 +376,7 @@
         wk = (async () => {
           try {
             const to = new Date(from.getFullYear(), from.getMonth(), from.getDate() + 6, 12);
-            const data = await api('scoreboard', { dates: `${ymdOf(from)}-${ymdOf(to)}` }, lg);
+            const data = await api('scoreboard', { dates: `${ymdOf(from)}-${ymdOf(to)}`, daysOnly: 1 }, lg);
             const set = new Set(data?.days || []);
             set.chunked = true; // leere Menge = wirklich spielfrei (nicht „unbekannt“)
             return set;
