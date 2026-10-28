@@ -6,7 +6,7 @@ const BASE = 'https://site.api.espn.com/apis/site/v2/sports';
 const LEAGUES = {
   bl1: 'soccer/ger.1', bl2: 'soccer/ger.2', ucl: 'soccer/uefa.champions', uel: 'soccer/uefa.europa',
   uecl: 'soccer/uefa.europa.conf', epl: 'soccer/eng.1', laliga: 'soccer/esp.1', seriea: 'soccer/ita.1',
-  ligue1: 'soccer/fra.1', mls: 'soccer/usa.1',
+  ligue1: 'soccer/fra.1', mls: 'soccer/usa.1', dfbpokal: 'soccer/ger.dfb_pokal',
   nfl: 'football/nfl', cfb: 'football/college-football',
   nba: 'basketball/nba', cbb: 'basketball/mens-college-basketball',
   nhl: 'hockey/nhl', mlb: 'baseball/mlb',

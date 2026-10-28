@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '3.2.1';
+  const VERSION = '3.3.0';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -36,6 +36,7 @@
     { id: 'seriea', abbr: 'SA', name: 'Serie A', cat: 'soccer', group: 'Topligen', sport: 'soccer', league: 'ita.1', color: '#1e9bff' },
     { id: 'ligue1', abbr: 'L1', name: 'Ligue 1', cat: 'soccer', group: 'Topligen', sport: 'soccer', league: 'fra.1', color: '#cddc39' },
     { id: 'mls', abbr: 'MLS', name: 'MLS', cat: 'soccer', group: 'Amerika', sport: 'soccer', league: 'usa.1', color: '#5a8dee' },
+    { id: 'dfbpokal', abbr: 'DFB', name: 'DFB-Pokal', cat: 'soccer', group: 'Pokal', sport: 'soccer', league: 'ger.dfb_pokal', color: '#20c5b5' },
 
     { id: 'nfl', abbr: 'NFL', name: 'NFL', cat: 'football', group: 'Profis', sport: 'football', league: 'nfl', color: '#3a7bec' },
     { id: 'cfb', abbr: 'CFB', name: 'NCAAF', cat: 'football', group: 'College', sport: 'football', league: 'college-football', groups: '80', color: '#e0483e', logo: 'logos/college/cfb.png' },
