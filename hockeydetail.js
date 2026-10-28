@@ -94,7 +94,7 @@
     $head.style.setProperty('--c-home', hc || '#2a2f38');
     $head.style.setProperty('--c-away', ac || '#2a2f38');
     let status;
-    if (g.live) status = `<span class="live-badge">${esc(g.status || 'Live')}</span>`;
+    if (g.live) status = `<span class="live-badge">${esc(g.status || 'Live')}${g.minute != null ? ` · ${esc(g.minute)}'` : ''}</span>`;
     else if (g.played) status = g.ot === 'PSO' ? 'Ende n.P.' : g.ot === 'OT' ? 'Ende n.V.' : 'Ende';
     else status = `${esc(fmtDate(g.date))}${g.time ? `, ${esc(g.time)} Uhr` : ''}`;
     const side = (t) => `

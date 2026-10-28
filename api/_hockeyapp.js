@@ -82,6 +82,19 @@ function splitDateTime(s) {
 const PERIOD_LABEL = { 1: '1. Drittel', 2: '2. Drittel', 3: '3. Drittel', 4: 'Verlängerung', 5: 'Penaltyschießen' };
 const num = (x) => Number(x) || 0;
 
+// Spielminute eines laufenden Spiels wie im Hockeyweb-Liveticker: currentGameTime = Sekunden im aktuellen
+// Drittel, modus = Spielzeiten (z. B. "20-20-20-OT5-PSO"). Minute = Länge der abgeschlossenen Drittel
+// + volle Minuten im aktuellen Drittel (nie über das Ende des Drittels hinaus). Penaltyschießen: keine Minute.
+function liveMinute(m) {
+  const period = Number(m.currentPeriod);
+  const sec = Number(m.currentGameTime);
+  if (!(period >= 1 && period <= 4) || !Number.isFinite(sec) || sec < 0) return null;
+  const mo = /^(\d+)-(\d+)-(\d+)(?:-OT(\d+))?/i.exec(String(m.modus || ''));
+  const len = mo ? [Number(mo[1]), Number(mo[2]), Number(mo[3]), Number(mo[4] || 5)] : [20, 20, 20, 5];
+  const before = len.slice(0, period - 1).reduce((a, b) => a + b, 0);
+  return before + Math.min(Math.floor(sec / 60), len[period - 1]);
+}
+
 function teamSide(map, id, score) {
   const t = map.get(Number(id));
   return { id: Number(id), name: t?.name || `Team ${id}`, logo: t?.logo || null, color: t?.color || null, alt: t?.alt || null, score };
@@ -109,7 +122,11 @@ function mapMatch(m, map, lgUrl) {
       : [],
   };
   if (finished && (m.hasPenalty || m.hasOvertime)) g.ot = m.hasPenalty ? 'PSO' : 'OT';
-  if (live) g.status = PERIOD_LABEL[Number(m.currentPeriod)] || 'Läuft';
+  if (live) {
+    g.status = PERIOD_LABEL[Number(m.currentPeriod)] || 'Läuft';
+    const minute = liveMinute(m);
+    if (minute != null) g.minute = minute;
+  }
   return g;
 }
 
@@ -119,11 +136,6 @@ function mapSchedule(payload, lgUrl) {
   const map = teamMap(block);
   return asList(block.matches).map((m) => mapMatch(m, map, lgUrl)).filter(Boolean)
     .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
-}
-
-// Rohdaten laufender Spiele (nur zur Feldsuche über ?debug=1; keine Zugangsdaten)
-function liveRaw(payload) {
-  return asList(payload?.schedule?.matches).filter((m) => m && !m.isDeleted && !m.finished && Number(m.currentPeriod) > 0).slice(0, 3);
 }
 
 // Wert aus einem Objekt über mehrere mögliche Feldnamen
@@ -288,5 +300,5 @@ function mapNews(payload, lg) {
 
 module.exports = {
   LEAGUES, ROUNDS, SEASON_ID, SITE, sign, apiUrl, parseColors, mapSchedule, mapMatch, teamMap, mapTable, computeTable,
-  liveRaw, mapRounds, mapEvents, mapLineup, mapStats, mapNews, splitDateTime,
+  liveMinute, mapRounds, mapEvents, mapLineup, mapStats, mapNews, splitDateTime,
 };

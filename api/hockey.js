@@ -88,9 +88,7 @@ async function handleGamesApp(al, key, date, q, res) {
   const games = all.filter((g) => g.date === date);
   const ttl = games.some((g) => g.live) ? TTL_LIVE : TTL_GAMES;
   cacheHeader(res, ttl);
-  const debug = q.debug ? { liveRaw: app.liveRaw(payload) } : undefined; // nur Feldnamen/Werte laufender Spiele
   res.status(200).json({
-    debug,
     league: { key, name: al.name, url: siteUrl(al, 'spielplan') },
     date,
     games,

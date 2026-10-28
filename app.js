@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '3.6.1';
+  const VERSION = '3.7.0';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -1505,7 +1505,7 @@
       lgId: lg.id, state: g.played ? 'post' : g.live ? 'in' : 'pre',
       mid: g.time || 'offen',
       start: g.played || g.live ? null : berlinMs(g.date, g.time),
-      statusHtml: g.played ? `<span class="mc-final">${g.ot === 'PSO' ? 'Ende n.P.' : g.ot === 'OT' ? 'Ende n.V.' : 'Ende'}</span>` : g.live ? `<span class="live-badge">${esc(g.status || 'Live')}</span>` : `<span>${g.time ? 'Uhr' : 'Zeit offen'}</span>`,
+      statusHtml: g.played ? `<span class="mc-final">${g.ot === 'PSO' ? 'Ende n.P.' : g.ot === 'OT' ? 'Ende n.V.' : 'Ende'}</span>` : g.live ? `<span class="live-badge">${esc(g.status || 'Live')}${g.minute != null ? ` · ${esc(g.minute)}'` : ''}</span>` : `<span>${g.time ? 'Uhr' : 'Zeit offen'}</span>`,
       home: side(g.home, g.played && g.home.score < g.away.score),
       away: side(g.away, g.played && g.away.score < g.home.score),
       extra: (g.played || g.live) && g.periods?.length ? `<span><em>Drittel</em> ${g.periods.map(([a, b]) => `${esc(a)}:${esc(b)}`).join(' · ')}</span>` : '',

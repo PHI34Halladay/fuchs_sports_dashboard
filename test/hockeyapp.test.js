@@ -193,3 +193,31 @@ test('Handler: Spieldetails und News', async () => {
   delete process.env.HOCKEYWEB_APP_KEY;
   global.fetch = realFetch;
 });
+
+test('liveMinute: Minute wie im Hockeyweb-Liveticker (Drittel + Minuten im Drittel)', () => {
+  const m = (currentPeriod, currentGameTime, modus = '20-20-20-OT5-PSO') => ({ currentPeriod, currentGameTime, modus });
+  assert.equal(app.liveMinute(m(1, 60)), 1);
+  assert.equal(app.liveMinute(m(1, 359)), 5);
+  assert.equal(app.liveMinute(m(1, 360)), 6);
+  assert.equal(app.liveMinute(m(2, 900)), 35); // Graz–Ferencváros: 15 min im 2. Drittel
+  assert.equal(app.liveMinute(m(2, 960)), 36);
+  assert.equal(app.liveMinute(m(3, 1300)), 60); // nie über das Drittelende hinaus
+  assert.equal(app.liveMinute(m(4, 125)), 62); // Verlängerung: 60 + 2
+  assert.equal(app.liveMinute(m(4, 125, '20-20-20-OT20-PSO')), 62);
+  assert.equal(app.liveMinute(m(2, 60, '15-15-15')), 16); // andere Drittellängen aus "modus"
+  assert.equal(app.liveMinute(m(2, 60, '')), 21); // ohne modus: 20-20-20-OT5
+  assert.equal(app.liveMinute(m(5, 30)), null); // Penaltyschießen: keine Minute
+  assert.equal(app.liveMinute({ currentPeriod: 2 }), null); // keine Zeit geliefert
+});
+
+test('mapSchedule: laufendes Spiel mit Minute, geplantes/beendetes ohne', () => {
+  const p = { schedule: { teams: [], matches: [
+    { matchId: 10, dateTime: '2026-10-28 19:30:00', finished: 0, currentPeriod: 2, currentGameTime: 960, modus: '20-20-20-OT5-PSO', homeTeamId: 1, awayTeamId: 2, homeScore: 2, awayScore: 0 },
+    { matchId: 11, dateTime: '2026-10-28 20:30:00', finished: 0, currentPeriod: 0, homeTeamId: 1, awayTeamId: 2 },
+    { matchId: 12, dateTime: '2026-10-27 19:30:00', finished: 1, currentPeriod: 3, currentGameTime: 1200, homeTeamId: 1, awayTeamId: 2, homeScore: 1, awayScore: 0 },
+  ] } };
+  const g = Object.fromEntries(app.mapSchedule(p, 'https://x').map((x) => [x.id, x]));
+  assert.equal(g['10'].minute, 36);
+  assert.equal('minute' in g['11'], false);
+  assert.equal('minute' in g['12'], false);
+});
