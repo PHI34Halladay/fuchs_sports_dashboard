@@ -60,7 +60,8 @@ function buildUrl(q) {
       // bestimmten Woche abfragen (Kalender liefert dort nur Wochen-Grenzen, keine Tage).
       if (q.week && RE_WEEK.test(q.week)) params.set('week', q.week);
       if (q.seasontype && RE_SEASONTYPE.test(q.seasontype)) params.set('seasontype', q.seasontype);
-      params.set('limit', '300');
+      // ESPN lehnt Datumsbereiche zusammen mit limit mit 400 ab → bei Bereichen ohne limit abfragen
+      if (!/-/.test(q.dates || '')) params.set('limit', '300');
       break;
     case 'summary':
       if (!RE_NUM.test(q.event || '') && !/^\d{6,12}$/.test(q.event || '')) {
