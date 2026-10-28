@@ -28,6 +28,7 @@ Gehostet auf Vercel, Code auf GitHub – ohne Build-Schritt, ohne Abhängigkeite
   - *Boxscore (alle Sportarten):* oben Umschalter zwischen den beiden Teams statt beide untereinander.
   - *Vor Spielbeginn (alle Ligen):* Vorschau mit Saisonduell, Form, Torhütern/Pitchern, Topspielern, Ausfällen, Prognose & Quoten, Tabelle.
 - **Spieler- & Team-Popups:** Teamprofil in Vereinsfarben mit ★-Favoritenknopf, Bilanz, nächstem Spiel und **Kader** (Spieler antippen → Spielerprofil).
+- **Spielerprofil (v3.4):** alles, was ESPN zu einem Spieler liefert – Kopf mit Nationalität/Flagge, Profil (Geburtsdatum, Größe/Gewicht in cm/kg, Debüt, Draft …), Saison-Kacheln, **Statistik-Tabelle** (je Wettbewerb bzw. Hauptrunde/Karriere), **Letzte Spiele** (Spiel für Spiel mit Gegner, Ergebnis, Form S/U/N und den Spielerwerten), **Videos** (direkt in der App abspielbar), **News** (öffnen im Lesemodus), **Stationen** (Vereinshistorie) und **Aus dem Kader** (Mitspieler antippen → deren Profil). Grunddaten erscheinen sofort, die Zusatzdaten laden nach. Quellen: `athletes/{id}`, `…/overview`, `…/gamelog`, `…/bio` (im Proxy `api/espn.js`).
 - **Dunkle Logo-Variante** per langem Druck auf ein Logo (pro Team gespeichert), **Auto-Reload**-Schalter im Footer (aktualisiert alle 30 s nur die Ergebnisse), Versionsnummer unten.
 
 ## Aufbau
@@ -65,6 +66,7 @@ Verwendete ESPN-Endpunkte:
 | rankings | `site.api.espn.com/apis/site/v2/sports/{sport}/{league}/rankings` (AP Top 25 für NCAAF/NCAAM) |
 | team | `site.api.espn.com/apis/site/v2/sports/{sport}/{league}/teams/{id}` (Team-Popup) |
 | athlete | `site.web.api.espn.com/apis/common/v3/sports/{sport}/{league}/athletes/{id}` (Spieler-Popup) |
+| overview / gamelog / bio | `site.web.api.espn.com/apis/common/v3/sports/{sport}/{league}/athletes/{id}/overview` (bzw. `/gamelog`, `/bio`) – Spielerprofil |
 | roster | `site.api.espn.com/apis/site/v2/sports/{sport}/{league}/teams/{id}/roster` (Kader im Team-Popup) |
 | search | `site.web.api.espn.com/apis/search/v2?query=…` (Spieler-/Teamsuche, ligaübergreifend) |
 

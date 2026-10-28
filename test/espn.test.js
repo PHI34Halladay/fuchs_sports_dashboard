@@ -16,3 +16,16 @@ test('ESPN-Proxy lehnt ungültige Ligaschlüssel weiterhin ab', () => {
   assert.throws(() => buildUrl({ type: 'scoreboard', sport: 'soccer', league: '../evil' }));
   assert.throws(() => buildUrl({ type: 'scoreboard', sport: 'soccer', league: 'ger 1' }));
 });
+
+test('ESPN-Proxy baut die Spieler-Endpunkte (overview, gamelog, bio)', () => {
+  for (const type of ['overview', 'gamelog', 'bio']) {
+    const url = buildUrl({ type, sport: 'soccer', league: 'ger.1', id: '303821' });
+    assert.match(url, new RegExp(`/soccer/ger\\.1/athletes/303821/${type}$`));
+  }
+});
+
+test('ESPN-Proxy prüft die Athlet-ID bei den Spieler-Endpunkten', () => {
+  for (const type of ['overview', 'gamelog', 'bio']) {
+    assert.throws(() => buildUrl({ type, sport: 'soccer', league: 'ger.1', id: '../x' }));
+  }
+});

@@ -17,6 +17,10 @@ const CACHE = {
   rankings: 300,
   team: 300,
   athlete: 300,
+  // Spieler-Profil: Saisonstatistik + News, Spiel-für-Spiel-Werte, Vereinshistorie
+  overview: 300,
+  gamelog: 600,
+  bio: 86400,
   roster: 3600,
   search: 600,
   article: 3600,
@@ -95,6 +99,12 @@ function buildUrl(q) {
     case 'athlete':
       if (!RE_ID.test(q.id || '')) throw new Error('Ungültige Athlet-ID');
       url = `${BASE_WEB_COMMON}/${sport}/${league}/athletes/${q.id}`;
+      break;
+    case 'overview':
+    case 'gamelog':
+    case 'bio':
+      if (!RE_ID.test(q.id || '')) throw new Error('Ungültige Athlet-ID');
+      url = `${BASE_WEB_COMMON}/${sport}/${league}/athletes/${q.id}/${type}`;
       break;
   }
 

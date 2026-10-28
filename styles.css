@@ -859,6 +859,34 @@ dialog.pf::backdrop { background: rgba(0, 0, 0, .7); backdrop-filter: blur(4px);
 .pf-rp-num { font-size: 12px; font-weight: 800; color: var(--pf-accent); text-align: center; }
 .pf-rp-name { font-size: 12px; font-weight: 600; line-height: 1.2; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .pf-rp-name small { display: block; color: var(--muted); font-weight: 500; font-size: 10px; }
+.pf-nation { display: flex; align-items: center; gap: 6px; }
+.pf-nation img { width: 18px; height: 12px; object-fit: cover; border-radius: 2px; }
+.pf-stat-rank { font-size: 10px; color: var(--pf-accent); margin-top: 2px; font-weight: 600; }
+.pf-tbl th, .pf-tbl td { padding: 6px 8px; text-align: center; font-size: 13px; }
+.pf-tbl th:nth-child(1), .pf-tbl td:nth-child(1) { text-align: left; width: auto; color: var(--text); position: sticky; left: 0; z-index: 1; background: var(--surface); }
+.pf-tbl th:nth-child(2), .pf-tbl td:nth-child(2) { text-align: center; }
+.pf-tbl td:first-child { font-weight: 600; }
+.pf-form { display: flex; align-items: center; gap: 5px; margin-bottom: 8px; font-size: 11px; }
+.pf-form .muted { margin-left: 6px; }
+.pf-res { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 6px; font-size: 11px; font-weight: 800; color: #fff; background: var(--surface-2); flex-shrink: 0; }
+.pf-res-win { background: #2f9e57; }
+.pf-res-draw { background: #7c8794; }
+.pf-res-loss { background: #d6453d; }
+.pf-gl-game { display: flex; align-items: center; gap: 6px; font-weight: 500; }
+.pf-gl-game img { width: 18px; height: 18px; object-fit: contain; }
+.pf-gl-date { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 38px; }
+.pf-gl-score { font-weight: 700; font-variant-numeric: tabular-nums; margin-left: 4px; }
+.pf-vids { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.pf-vid-t { font-size: 12px; font-weight: 600; margin-top: 5px; line-height: 1.25; }
+.pf-news-list { display: grid; gap: 6px; }
+.pf-news { display: grid; grid-template-columns: 72px 1fr; gap: 10px; align-items: center; padding: 6px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); text-align: left; }
+.pf-news:hover { border-color: var(--pf-accent); }
+.pf-news img, .pf-news-ph { width: 72px; height: 48px; border-radius: 6px; object-fit: cover; background: var(--surface-2); display: block; }
+.pf-news-t { font-size: 13px; font-weight: 600; line-height: 1.25; min-width: 0; }
+.pf-news-t small { display: block; color: var(--muted); font-weight: 500; font-size: 11px; margin-top: 2px; }
+.pf-hist { grid-template-columns: 1fr auto auto; }
+.pf-hist-n { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.pf-hist-n img { width: 22px; height: 22px; object-fit: contain; }
 
 @media (max-width: 640px) {
   dialog.pf { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; border-radius: 0; border: 0; margin: 0; }

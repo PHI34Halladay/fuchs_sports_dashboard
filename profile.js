@@ -9,6 +9,7 @@
   let ctx = null; // { api, esc, fav: { get(teamId, league), toggle(teamId, league) } }
   let reqId = 0;
   let activeLeague = null; // { sport, league } – Kontext für verschachtelte Klicks (Team-Chip, nächstes Spiel)
+  let pl = null; // aktuell geöffneter Spieler: { a, raw, ov, gl, bio, news, leagueName, loadingExtras }
 
   const dlg = document.createElement('dialog');
   dlg.className = 'pf';
@@ -29,10 +30,24 @@
     reqId++;
     if (dlg.open) dlg.close();
   }
-  dlg.addEventListener('close', () => { reqId++; });
+  dlg.addEventListener('close', () => { reqId++; dlg.querySelectorAll('video').forEach((v) => v.pause()); });
   dlg.addEventListener('click', (e) => {
     if (e.target === dlg) { close(); return; }
     if (e.target.closest('.pf-close')) { close(); return; }
+    // Video im Profil: Vorschaubild antippen → Abspielen direkt in der App
+    const vf = e.target.closest('.gc-video-frame[data-video-src]');
+    if (vf) {
+      vf.outerHTML = `<div class="gc-video-frame gc-video-playing"><video controls autoplay playsinline src="${ctx.esc(vf.dataset.videoSrc)}"></video></div>`;
+      return;
+    }
+    // News zum Spieler: Lesemodus der App
+    const nw = e.target.closest('[data-pf-news]');
+    if (nw) {
+      e.stopPropagation();
+      const item = pl?.news?.[+nw.dataset.pfNews];
+      if (item && window.Reader) window.Reader.open(item, { ...activeLeague, name: pl.leagueName });
+      return;
+    }
     const fs = e.target.closest('[data-pf-fav]');
     if (fs) {
       e.stopPropagation();
@@ -88,10 +103,20 @@
     if (!ctx || !id) return;
     if (league) activeLeague = league;
     const myId = startLoad();
+    pl = null;
     try {
       const data = await ctx.api('athlete', { id }, activeLeague);
       if (myId !== reqId) return;
-      renderPlayer(data.athlete || {});
+      // Grunddaten sofort zeigen, die Zusatzdaten (Statistik, Spielverlauf, News …) kommen danach dazu
+      pl = { a: data.athlete || {}, raw: data, ov: null, gl: null, bio: null, news: [], leagueName: data.league?.name || data.league?.shortName || '', loadingExtras: true };
+      renderPlayer();
+      const extra = (type) => ctx.api(type, { id }, activeLeague).catch(() => null);
+      const [ov, gl, bio] = await Promise.all([extra('overview'), extra('gamelog'), extra('bio')]);
+      if (myId !== reqId) return;
+      pl.ov = ov; pl.gl = gl; pl.bio = bio;
+      pl.news = (ov?.news || []).filter((n) => n.headline && n.id).slice(0, 6);
+      pl.loadingExtras = false;
+      renderPlayer();
     } catch (e) {
       if (myId !== reqId) return;
       $body.innerHTML = `<div class="status error">Spielerdaten konnten nicht geladen werden: ${ctx.esc(e.message)}</div>`;
@@ -124,12 +149,94 @@
   }
 
   // ---------- Spieler-Ansicht ----------
-  function renderPlayer(a) {
+  const POS_DE = { Goalkeeper: 'Torwart', Defender: 'Abwehr', Midfielder: 'Mittelfeld', Forward: 'Sturm', Attacker: 'Sturm', 'Center Back': 'Innenverteidiger', 'Centre Back': 'Innenverteidiger', 'Right Back': 'Rechtsverteidiger', 'Left Back': 'Linksverteidiger', 'Defensive Midfielder': 'Defensives Mittelfeld', 'Central Midfielder': 'Zentrales Mittelfeld', 'Attacking Midfielder': 'Offensives Mittelfeld', 'Left Winger': 'Linksaußen', 'Right Winger': 'Rechtsaußen', Striker: 'Stürmer' };
+  // Fußball-Kürzel von ESPN ins Deutsche (US-Sport-Kürzel wie PTS, REB, AST bleiben)
+  const SOCCER_LABELS = { STRT: 'Start', APP: 'Einsätze', SUB: 'Einw.', G: 'Tore', A: 'Vorl.', SHOT: 'Schüsse', SOG: 'aufs Tor', FC: 'Fouls', FA: 'Gefoult', OF: 'Abseits', YC: 'Gelb', RC: 'Rot', SV: 'Paraden', GA: 'Gegentore', CS: 'Zu Null' };
+  const SPLIT_DE = [[/regular season/i, 'Hauptrunde'], [/preseason/i, 'Vorbereitung'], [/postseason|playoffs?/i, 'Playoffs'], [/career/i, 'Karriere'], [/german bundesliga/i, 'Bundesliga'], [/champions league/i, 'Champions League'], [/international friendly/i, 'Freundschaftsspiele'], [/nations league/i, 'Nations League'], [/world cup/i, 'Weltmeisterschaft']];
+  function splitName(n) {
+    let s = String(n || '');
+    for (const [re, de] of SPLIT_DE) s = s.replace(re, de);
+    return s;
+  }
+  const RES_DE = { W: ['S', 'win'], D: ['U', 'draw'], T: ['U', 'draw'], L: ['N', 'loss'] };
+  const fmtDate = (iso, opts) => { const d = new Date(iso); return Number.isNaN(+d) ? '' : new Intl.DateTimeFormat('de-DE', opts).format(d); };
+
+  // ESPN liefert Größe/Gewicht in US-Einheiten – für die Anzeige auf cm/kg umrechnen
+  function metric(a) {
+    const out = {};
+    const hm = /^(\d+)'\s*(\d+)?/.exec(a.displayHeight || '');
+    if (hm) out.height = `${Math.round((+hm[1] * 12 + (+hm[2] || 0)) * 2.54)} cm`;
+    const wm = /^(\d+)\s*lbs?/i.exec(a.displayWeight || '');
+    if (wm) out.weight = `${Math.round(+wm[1] * 0.45359237)} kg`;
+    return out;
+  }
+
+  function parseGamelog(gl) {
+    if (!gl) return null;
+    const evMap = gl.events || {};
+    const rows = new Map();
+    for (const st of gl.seasonTypes || []) {
+      for (const cat of st.categories || []) {
+        for (const e of cat.events || []) {
+          if (!e?.eventId || !Array.isArray(e.stats) || rows.has(e.eventId) || !evMap[e.eventId]) continue;
+          rows.set(e.eventId, { meta: evMap[e.eventId], stats: e.stats });
+        }
+      }
+    }
+    const list = [...rows.values()].sort((x, y) => new Date(y.meta.gameDate) - new Date(x.meta.gameDate)).slice(0, 10);
+    return list.length ? { labels: gl.labels || [], names: gl.displayNames || [], list } : null;
+  }
+
+  function statTables(ov, soccer) {
+    const raw = ov?.statistics;
+    const tables = (Array.isArray(raw) ? raw : raw ? [raw] : []).filter((t) => (t.labels || []).length && (t.splits || []).length);
+    return tables.map((t) => {
+      let splits = t.splits.filter((s) => Array.isArray(s.stats));
+      // Wettbewerbe ohne einen einzigen Wert (z. B. Nations League ohne Einsatz) ausblenden
+      const used = splits.filter((s) => s.stats.some((v) => v && v !== '0' && v !== '--' && v !== '0.0'));
+      if (used.length) splits = used;
+      const head = t.labels.map((l, i) => `<th title="${ctx.esc(t.displayNames?.[i] || '')}">${ctx.esc((soccer && SOCCER_LABELS[l]) || l)}</th>`).join('');
+      const body = splits.map((s) => `<tr><td>${ctx.esc(splitName(s.displayName))}</td>${t.labels.map((_, i) => `<td>${ctx.esc(s.stats[i] ?? '–')}</td>`).join('')}</tr>`).join('');
+      return `<div class="table-wrap"><table class="pf-tbl"><thead><tr><th></th>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+    }).join('');
+  }
+
+  function gamelogHtml(g, soccer) {
+    const badge = (r) => { const m = RES_DE[r]; return m ? `<span class="pf-res pf-res-${m[1]}">${m[0]}</span>` : '<span class="pf-res"></span>'; };
+    const form = g.list.slice(0, 5).map((r) => badge(r.meta.gameResult)).join('');
+    const head = g.labels.map((l, i) => `<th title="${ctx.esc(g.names[i] || '')}">${ctx.esc((soccer && SOCCER_LABELS[l]) || l)}</th>`).join('');
+    const body = g.list.map(({ meta: m, stats }) => {
+      const opp = m.opponent || {};
+      const hs = m.homeTeamScore, as = m.awayTeamScore;
+      const score = hs !== undefined && hs !== '' && as !== undefined && as !== '' ? `${hs}:${as}` : String(m.score || '');
+      const oppName = ctx.esc(opp.abbreviation || opp.displayName || '');
+      const oppEl = opp.id ? `<span class="gc-link" data-team-id="${ctx.esc(opp.id)}">${oppName}</span>` : oppName;
+      return `<tr>
+        <td><div class="pf-gl-game">
+          <span class="pf-gl-date">${ctx.esc(fmtDate(m.gameDate, { day: '2-digit', month: '2-digit' }))}</span>
+          ${badge(m.gameResult)}
+          <span class="muted">${ctx.esc(m.atVs || '')}</span>
+          ${opp.logo ? `<img src="${ctx.esc(opp.logo)}" alt="" loading="lazy">` : ''}${oppEl}
+          <span class="pf-gl-score">${ctx.esc(score)}</span>
+        </div></td>
+        ${g.labels.map((_, i) => `<td>${ctx.esc(stats[i] ?? '–')}</td>`).join('')}</tr>`;
+    }).join('');
+    const leagueNote = g.list[0]?.meta?.leagueShortName || '';
+    return section(`Letzte Spiele${leagueNote ? ` <span class="muted">· ${ctx.esc(leagueNote)}</span>` : ''}`,
+      `<div class="pf-form">${form}<span class="muted">Form (neueste zuerst)</span></div>
+       <div class="table-wrap"><table class="pf-tbl pf-gl"><thead><tr><th>Spiel</th>${head}</tr></thead><tbody>${body}</tbody></table></div>`);
+  }
+
+  function renderPlayer() {
+    const { a, raw, ov, gl, bio } = pl;
+    const soccer = activeLeague?.sport === 'soccer';
     setAccent(a.team?.color, a.team?.alternateColor);
-    const pos = a.position?.displayName || '';
+    const posName = a.position?.displayName || a.position?.name || '';
+    const pos = POS_DE[posName] || posName;
     const teamName = a.team?.displayName || a.team?.name || '';
     const teamLogo = bestLogo(a.team?.logos, a.team?.logo);
     const statusActive = !a.status || a.status.type === 'active';
+    const nation = a.citizenship || a.birthCountry?.displayName || '';
 
     $head.innerHTML = `
       <div class="pf-player-head">
@@ -137,30 +244,80 @@
         <div class="pf-info">
           <div class="pf-name">${ctx.esc(a.displayName || '')}</div>
           <div class="pf-sub">${a.jersey ? `#${ctx.esc(a.jersey)} · ` : ''}${ctx.esc(pos)}${!statusActive ? ` · <span class="pf-status">${ctx.esc(a.status?.name || '')}</span>` : ''}</div>
+          ${nation ? `<div class="pf-sub pf-nation">${a.flag?.href ? `<img src="${ctx.esc(a.flag.href)}" alt="">` : ''}${ctx.esc(nation)}</div>` : ''}
           ${a.team?.id ? `<button type="button" class="pf-team-chip" data-team-id="${ctx.esc(a.team.id)}">${window.LogoPref.img(a.team.id, teamLogo)}${ctx.esc(teamName)}</button>` : ''}
         </div>
       </div>`;
 
-    const bio = [
-      ['Größe', a.displayHeight], ['Gewicht', a.displayWeight], ['Alter', a.age],
-      ['Geburtsort', a.displayBirthPlace], ['Erfahrung', a.displayExperience],
+    // --- Profil ---
+    const m = metric(a);
+    const dob = a.dateOfBirth ? fmtDate(a.dateOfBirth, { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' }) : (a.displayDOB || '');
+    const bioRows = [
+      ['Nationalität', nation], ['Geboren', dob], ['Alter', a.age],
+      ['Größe', m.height ? `${m.height} (${a.displayHeight})` : a.displayHeight],
+      ['Gewicht', m.weight ? `${m.weight} (${a.displayWeight})` : a.displayWeight],
+      ['Geburtsort', a.displayBirthPlace], ['Erfahrung', a.displayExperience], ['Debüt', a.debutYear],
       ['Draft', a.displayDraft], ['Hand', a.hand?.displayValue], ['College', a.collegeAthlete?.school || a.college?.name],
+      ['Fuß', a.foot?.displayValue || a.preferredFoot?.displayValue],
     ].filter(([, v]) => v !== undefined && v !== null && v !== '');
-    const bioHtml = bio.length ? section('Profil', `<dl class="gc-info pf-bio">${bio.map(([k, v]) => `<dt>${ctx.esc(k)}</dt><dd>${ctx.esc(v)}</dd>`).join('')}</dl>`) : '';
+    const bioHtml = bioRows.length ? section('Profil', `<dl class="gc-info pf-bio">${bioRows.map(([k, v]) => `<dt>${ctx.esc(k)}</dt><dd>${ctx.esc(v)}</dd>`).join('')}</dl>`) : '';
 
+    // --- Saison-Kacheln (ESPN statsSummary) ---
     const stats = a.statsSummary?.statistics || [];
     const statsHtml = stats.length
       ? section(ctx.esc(a.statsSummary.displayName || 'Statistik'), `<div class="pf-stats">${stats.map((s) => `
-          <div class="pf-stat"><div class="pf-stat-val">${ctx.esc(s.displayValue)}</div><div class="pf-stat-label">${ctx.esc(s.shortDisplayName || s.abbreviation || s.displayName)}</div></div>`).join('')}</div>`)
+          <div class="pf-stat"><div class="pf-stat-val">${ctx.esc(s.displayValue)}</div><div class="pf-stat-label">${ctx.esc(s.shortDisplayName || s.abbreviation || s.displayName)}</div>${s.rankDisplayValue ? `<div class="pf-stat-rank">${ctx.esc(s.rankDisplayValue)}</div>` : ''}</div>`).join('')}</div>`)
       : '';
 
+    // --- Verletzung ---
     const injuries = (a.injuries || []).filter((i) => i.status || i.details);
     const injHtml = injuries.length
       ? section('Verletzung', injuries.map((i) => `<div class="gc-row"><span>${ctx.esc(i.status || '')}</span><span class="muted">${ctx.esc(i.details?.type || i.longComment || i.shortComment || '')}</span></div>`).join(''))
       : '';
 
-    $body.innerHTML = (bioHtml + statsHtml + injHtml) || '<div class="gc-empty">Für diesen Spieler liegen keine weiteren Daten vor.</div>';
+    // --- Zusatzdaten (kommen nach den Grunddaten) ---
+    const tables = statTables(ov, soccer);
+    const tableHtml = tables ? section('Statistik', tables) : '';
+    const glData = parseGamelog(gl);
+    const glHtml = glData ? gamelogHtml(glData, soccer) : '';
 
+    const vids = (raw?.videos || []).map((v) => ({ v, src: v.links?.source?.HD?.href || v.links?.source?.href })).filter((x) => x.src).slice(0, 4);
+    const vidHtml = vids.length ? section('Videos', `<div class="pf-vids">${vids.map(({ v, src }) => `
+        <div class="pf-vid">
+          <div class="gc-video-frame" data-video-src="${ctx.esc(src)}">${v.thumbnail ? `<img src="${ctx.esc(v.thumbnail)}" alt="" loading="lazy">` : ''}<span class="gc-video-play">▶</span></div>
+          <div class="pf-vid-t">${ctx.esc(v.headline || v.title || '')}</div>
+        </div>`).join('')}</div>`) : '';
+
+    const newsHtml = pl.news.length ? section('News', `<div class="pf-news-list">${pl.news.map((n, i) => {
+      const img = (n.images || []).find((x) => x.url)?.url;
+      const when = fmtDate(n.published, { day: '2-digit', month: '2-digit', year: 'numeric' });
+      return `<button type="button" class="pf-news" data-pf-news="${i}">
+        ${img ? `<img src="${ctx.esc(img)}" alt="" loading="lazy">` : '<span class="pf-news-ph"></span>'}
+        <span class="pf-news-t">${ctx.esc(n.headline)}<small>${n.type === 'Media' ? '▶ Video · ' : ''}${ctx.esc(when)}</small></span>
+      </button>`;
+    }).join('')}</div>`) : '';
+
+    const history = (bio?.teamHistory || []).filter((t) => t.displayName);
+    const histHtml = history.length ? section('Stationen', history.map((t) => {
+      const seasons = String(t.seasons || '').replace(/-CURRENT/i, ' – heute').replace(/(\d{4})-(\d{4})/g, (_, x, y) => (x === y ? x : `${x}–${y}`));
+      return `<div class="gc-row pf-hist">
+        <span class="pf-hist-n">${t.logo ? `<img src="${ctx.esc(t.logo)}" alt="" loading="lazy">` : ''}${ctx.esc(t.displayName)}</span>
+        <span class="muted">${ctx.esc(seasons)}</span>
+        <span class="muted">${t.seasonCount ? `${ctx.esc(t.seasonCount)} Saisons` : ''}</span>
+      </div>`;
+    }).join('')) : '';
+
+    const mates = (raw?.playerSwitcher?.athletes || []).filter((p) => p.id && p.id !== a.id).slice(0, 14);
+    const mateHtml = mates.length ? section('Aus dem Kader', `<div class="pf-roster">${mates.map((p) => `
+        <button type="button" class="pf-rp" data-player-id="${ctx.esc(p.id)}">
+          ${p.headshot?.href ? `<img src="${ctx.esc(p.headshot.href)}" alt="" loading="lazy">` : '<span class="pf-rp-ph"></span>'}
+          <span class="pf-rp-num">${ctx.esc(String(p.jersey || p.displayJersey || '').replace('#', ''))}</span>
+          <span class="pf-rp-name">${ctx.esc(p.displayName || '')}<small>${ctx.esc(POS_DE[p.position?.displayName] || p.position?.abbreviation || '')}</small></span>
+        </button>`).join('')}</div>`) : '';
+
+    const loading = pl.loadingExtras ? '<div class="gc-loading"><div class="skeleton"></div><div class="skeleton"></div></div>' : '';
+    const all = bioHtml + statsHtml + injHtml + tableHtml + glHtml + vidHtml + newsHtml + histHtml + mateHtml;
+    $body.innerHTML = all ? all + loading : (loading || '<div class="gc-empty">Für diesen Spieler liegen keine weiteren Daten vor.</div>');
   }
 
   // ---------- Team-Ansicht ----------
