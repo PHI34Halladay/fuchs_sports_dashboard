@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { buildUrl } = require('../api/espn.js');
+const { buildUrl, expandRange } = require('../api/espn.js');
 
 test('ESPN-Proxy akzeptiert Ligaschlüssel mit Unterstrich (DFB-Pokal)', () => {
   const url = buildUrl({ type: 'scoreboard', sport: 'soccer', league: 'ger.dfb_pokal', dates: '20261028' });
@@ -28,4 +28,16 @@ test('ESPN-Proxy prüft die Athlet-ID bei den Spieler-Endpunkten', () => {
   for (const type of ['overview', 'gamelog', 'bio']) {
     assert.throws(() => buildUrl({ type, sport: 'soccer', league: 'ger.1', id: '../x' }));
   }
+});
+
+test('ESPN-Proxy zerlegt Datumsbereiche in Einzeltage (ESPN lehnt Bereiche bei Fußball ab)', () => {
+  assert.deepStrictEqual(expandRange('20261027-20261029'), ['20261027', '20261028', '20261029']);
+  assert.deepStrictEqual(expandRange('20261030-20261102'), ['20261030', '20261031', '20261101', '20261102']);
+  assert.strictEqual(expandRange('20261028'), null);
+});
+
+test('ESPN-Proxy begrenzt Datumsbereiche auf 14 Tage und lehnt umgekehrte ab', () => {
+  assert.strictEqual(expandRange('20261001-20261014').length, 14);
+  assert.deepStrictEqual(expandRange('20261001-20261015'), []);
+  assert.deepStrictEqual(expandRange('20261030-20261027'), []);
 });

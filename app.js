@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '3.5.0';
+  const VERSION = '3.5.1';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -312,6 +312,14 @@
   // wird die konkrete Woche (seasontype/week) separat abgefragt.
   const gameDayCache = new Map();
 
+  // Montag der Woche (12 Uhr) – Blockgröße für die Spieltag-Abfragen der Runden-Ligen
+  function weekStartOf(d) {
+    const x = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12);
+    x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+    return x;
+  }
+  const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n, 12);
+
   async function gameDaySet(lg, forDate) {
     if (!isEspn(lg)) return null;
     const tz = leagueTZ(lg);
@@ -357,30 +365,26 @@
       return days;
     }
 
-    // Rundenbasiert (Pokal, z. B. DFB-Pokal): ESPN liefert Runden mit Zeitraum (1. Runde, 2. Runde …), aber keine
-    // Einzeltage. Die Spieltage einer Runde kommen aus einer Abfrage über den Datumsbereich der Runde.
-    if (lg.cup) {
-      const tYmd = ymdInTZ(target, tz);
-      let round = null;
-      for (const g of cal) {
-        for (const e of g.entries || []) {
-          if (tYmd >= ymdInTZ(new Date(e.startDate), tz) && tYmd <= ymdInTZ(new Date(e.endDate), tz)) round = e;
-        }
-      }
-      if (!round) return null;
-      const roundKey = `${lg.id}:round:${round.value}`;
-      let rDays = gameDayCache.get(roundKey);
-      if (!rDays) {
-        rDays = (async () => {
+    // Rundenbasiert (DFB-Pokal, Champions/Europa/Conference League): ESPN liefert Runden mit Zeitraum, aber keine
+    // Einzeltage – und lehnt Datumsbereiche bei Fußball ab. Der Proxy zerlegt deshalb kurze Bereiche (7 Tage) selbst
+    // in Einzeltage und meldet die Tage mit Spielen. Die App holt je Woche einen Block und merkt ihn sich.
+    if (lg.sport === 'soccer') {
+      const from = weekStartOf(target);
+      const key = `${lg.id}:wk:${ymdOf(from)}`;
+      let wk = gameDayCache.get(key);
+      if (!wk) {
+        wk = (async () => {
           try {
-            const range = `${ymdInTZ(new Date(round.startDate), tz)}-${ymdInTZ(new Date(round.endDate), tz)}`;
-            const data = await api('scoreboard', { dates: range }, lg);
-            return new Set((data?.events || []).map((ev) => ymdInTZ(new Date(ev.date), tz)));
-          } catch { gameDayCache.delete(roundKey); return null; }
+            const to = new Date(from.getFullYear(), from.getMonth(), from.getDate() + 6, 12);
+            const data = await api('scoreboard', { dates: `${ymdOf(from)}-${ymdOf(to)}` }, lg);
+            const set = new Set(data?.days || []);
+            set.chunked = true; // leere Menge = wirklich spielfrei (nicht „unbekannt“)
+            return set;
+          } catch { gameDayCache.delete(key); return null; }
         })();
-        gameDayCache.set(roundKey, rDays);
+        gameDayCache.set(key, wk);
       }
-      return rDays;
+      return wk;
     }
 
     // Wochenbasiert (NFL/NCAAF): Vergleich über Kalendertage (ymdInTZ), nicht über rohe Zeitstempel.
@@ -411,21 +415,37 @@
     return days;
   }
 
-  // Beim Liga-Wechsel: von heute aus vorwärts zum nächsten Tag mit Spiel springen.
+  // Nächster (delta=1) bzw. vorheriger (delta=-1) Tag mit Spiel ab `from` (ohne `from` selbst) – für ‹ ›.
+  // Liefert ein Datum, null = es gibt in dieser Richtung keinen Spieltag mehr (Saisonende/-beginn),
+  // undefined = keine Spieltag-Daten verfügbar (dann zählt der nächste Kalendertag).
+  async function stepGameDay(lg, from, delta) {
+    const tz = leagueTZ(lg);
+    const round = lg.sport === 'soccer';
+    let d = addDays(from, delta);
+    for (let i = 0; i < (round ? 400 : 120); i++, d = addDays(d, delta)) {
+      // Runden-Ligen: Wochenblöcke jeweils drei auf einmal vorladen (Spielpausen können Wochen dauern)
+      if (round && i % 14 === 0) await Promise.all([0, 7, 14].map((k) => gameDaySet(lg, addDays(d, delta * k))));
+      const days = await gameDaySet(lg, d);
+      if (!days || (!days.size && !days.chunked)) return undefined;
+      const ymd = ymdInTZ(d, tz);
+      if (days.has(ymd)) return d;
+      const meta = gameDayCache.get(`${lg.id}:calmeta`) || {};
+      if (delta > 0 && meta.end && ymd > ymdInTZ(new Date(meta.end), tz)) return null;
+      if (delta < 0 && meta.start && ymd < ymdInTZ(new Date(meta.start), tz)) return null;
+    }
+    return null;
+  }
+
+  // Beim Liga-Wechsel: heute, sonst der nächste Tag mit Spiel (gibt es keinen mehr, der letzte davor).
   async function snapToGameDay(lg) {
     if (!isEspn(lg)) return;
-    let d = defaultAnchor(lg);
-    for (let i = 0; i < 60; i++) {
-      const days = await gameDaySet(lg, d);
-      if (!days || !days.size) return;
-      if (days.has(ymdInTZ(d, leagueTZ(lg)))) {
-        if (currentLeague()?.id !== lg.id) return;
-        state.date = d;
-        return;
-      }
-      d = new Date(d);
-      d.setDate(d.getDate() + 1);
-    }
+    const today = defaultAnchor(lg);
+    const days = await gameDaySet(lg, today);
+    if (!days || (!days.size && !days.chunked)) return;
+    if (days.has(ymdInTZ(today, leagueTZ(lg)))) return;
+    let target = await stepGameDay(lg, today, 1);
+    if (!target) target = await stepGameDay(lg, today, -1);
+    if (target && currentLeague()?.id === lg.id) state.date = target;
   }
 
   async function api(type, params = {}, leagueOverride) {
@@ -1815,16 +1835,10 @@
     }
 
     if (!lg.isFav) {
-      let d = new Date(plain);
-      let found = false;
-      for (let i = 0; i < 60; i++) {
-        const days = await gameDaySet(lg, d);
-        if (!days || !days.size) { found = true; break; }
-        if (days.has(ymdInTZ(d, leagueTZ(lg)))) { found = true; break; }
-        d.setDate(d.getDate() + delta);
-      }
+      const target = await stepGameDay(lg, state.date, delta);
       if (currentLeague()?.id !== lg.id) return;
-      state.date = found ? d : plain;
+      if (target === null) return; // kein weiterer Spieltag in dieser Richtung: auf dem Tag bleiben
+      state.date = target || plain;
       load();
       return;
     }
