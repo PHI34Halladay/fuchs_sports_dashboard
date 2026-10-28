@@ -121,6 +121,11 @@ function mapSchedule(payload, lgUrl) {
     .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
 }
 
+// Rohdaten laufender Spiele (nur zur Feldsuche über ?debug=1; keine Zugangsdaten)
+function liveRaw(payload) {
+  return asList(payload?.schedule?.matches).filter((m) => m && !m.isDeleted && !m.finished && Number(m.currentPeriod) > 0).slice(0, 3);
+}
+
 // Wert aus einem Objekt über mehrere mögliche Feldnamen
 function pick(o, names) {
   for (const n of names) if (o && o[n] != null && o[n] !== '') return Number(o[n]);
@@ -283,5 +288,5 @@ function mapNews(payload, lg) {
 
 module.exports = {
   LEAGUES, ROUNDS, SEASON_ID, SITE, sign, apiUrl, parseColors, mapSchedule, mapMatch, teamMap, mapTable, computeTable,
-  mapRounds, mapEvents, mapLineup, mapStats, mapNews, splitDateTime,
+  liveRaw, mapRounds, mapEvents, mapLineup, mapStats, mapNews, splitDateTime,
 };

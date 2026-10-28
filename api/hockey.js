@@ -82,12 +82,15 @@ function pickRound(al, rounds, q) {
 async function handleGamesApp(al, key, date, q, res) {
   const rounds = await leagueRounds(al);
   const round = pickRound(al, rounds, q);
-  const all = app.mapSchedule(await getApp('schedule', { roundId: round, seasonId: app.SEASON_ID }, TTL_LIVE), siteUrl(al, 'spielplan'));
+  const payload = await getApp('schedule', { roundId: round, seasonId: app.SEASON_ID }, TTL_LIVE);
+  const all = app.mapSchedule(payload, siteUrl(al, 'spielplan'));
   if (!all.length) throw new Error('App-API ohne Spiele');
   const games = all.filter((g) => g.date === date);
   const ttl = games.some((g) => g.live) ? TTL_LIVE : TTL_GAMES;
   cacheHeader(res, ttl);
+  const debug = q.debug ? { liveRaw: app.liveRaw(payload) } : undefined; // nur Feldnamen/Werte laufender Spiele
   res.status(200).json({
+    debug,
     league: { key, name: al.name, url: siteUrl(al, 'spielplan') },
     date,
     games,
