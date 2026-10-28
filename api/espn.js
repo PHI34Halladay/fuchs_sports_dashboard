@@ -23,7 +23,7 @@ const CACHE = {
 };
 
 const RE_SPORT = /^[a-z-]{2,30}$/;
-const RE_LEAGUE = /^[a-z0-9.-]{2,40}$/;
+const RE_LEAGUE = /^[a-z0-9._-]{2,40}$/;
 const RE_DATES = /^\d{8}(-\d{8})?$/;
 const RE_NUM = /^\d{1,6}$/;
 const RE_ID = /^\d{1,10}$/;
