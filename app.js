@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '3.3.0';
+  const VERSION = '3.3.1';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -36,7 +36,7 @@
     { id: 'seriea', abbr: 'SA', name: 'Serie A', cat: 'soccer', group: 'Topligen', sport: 'soccer', league: 'ita.1', color: '#1e9bff' },
     { id: 'ligue1', abbr: 'L1', name: 'Ligue 1', cat: 'soccer', group: 'Topligen', sport: 'soccer', league: 'fra.1', color: '#cddc39' },
     { id: 'mls', abbr: 'MLS', name: 'MLS', cat: 'soccer', group: 'Amerika', sport: 'soccer', league: 'usa.1', color: '#5a8dee' },
-    { id: 'dfbpokal', abbr: 'DFB', name: 'DFB-Pokal', cat: 'soccer', group: 'Pokal', sport: 'soccer', league: 'ger.dfb_pokal', color: '#20c5b5' },
+    { id: 'dfbpokal', abbr: 'DFB', name: 'DFB-Pokal', cat: 'soccer', group: 'Pokal', sport: 'soccer', league: 'ger.dfb_pokal', cup: true, color: '#20c5b5', logo: 'logos/dfbpokal.png' },
 
     { id: 'nfl', abbr: 'NFL', name: 'NFL', cat: 'football', group: 'Profis', sport: 'football', league: 'nfl', color: '#3a7bec' },
     { id: 'cfb', abbr: 'CFB', name: 'NCAAF', cat: 'football', group: 'College', sport: 'football', league: 'college-football', groups: '80', color: '#e0483e', logo: 'logos/college/cfb.png' },
@@ -73,6 +73,8 @@
   // und haben keinen News-Tab.
   // Kein News-Tab: Amateurfußball und Hockeyweb-Ligen ohne eigene Meldungsgruppe (NL, SHL)
   function noNewsTab(l) { return !!(l && (l.amateur || l.noNews || l.isLive)); }
+  // Pokal-Wettbewerbe (K.-o.-System) haben keine Tabelle → Tab „Tabelle“ entfällt
+  function noStandingsTab(l) { return !!(l && l.cup); }
   function isOwnSource(l) { return !!(l && (l.amateur || l.hockey)); }
   const isEspn = (l) => !!(l && l.sport && l.league);
 
@@ -91,7 +93,7 @@
   const state = {
     leagueId: initialLeagueId,
     todayOnly: false, // „Heute“-Filter: nur Sportarten/Ligen mit Spiel am heutigen Tag anzeigen
-    tab: initialLeagueId === FAV_ID ? 'scores' : (['scores', 'standings', 'news'].includes(saved.tab) && !(noNewsTab(initialLeague) && saved.tab === 'news') ? saved.tab : 'scores'),
+    tab: initialLeagueId === FAV_ID ? 'scores' : (['scores', 'standings', 'news'].includes(saved.tab) && !(noNewsTab(initialLeague) && saved.tab === 'news') && !(noStandingsTab(initialLeague) && saved.tab === 'standings') ? saved.tab : 'scores'),
     date: defaultAnchor(initialLeague),
     top25Only: !!saved.top25Only,
     standingsConf: null, // Tabellen-Ansicht bei NCAAF/NCAAM: 'top25' oder ein Conference-Name
@@ -353,6 +355,32 @@
         gameDayCache.set(daysKey, days);
       }
       return days;
+    }
+
+    // Rundenbasiert (Pokal, z. B. DFB-Pokal): ESPN liefert Runden mit Zeitraum (1. Runde, 2. Runde …), aber keine
+    // Einzeltage. Die Spieltage einer Runde kommen aus einer Abfrage über den Datumsbereich der Runde.
+    if (lg.cup) {
+      const tYmd = ymdInTZ(target, tz);
+      let round = null;
+      for (const g of cal) {
+        for (const e of g.entries || []) {
+          if (tYmd >= ymdInTZ(new Date(e.startDate), tz) && tYmd <= ymdInTZ(new Date(e.endDate), tz)) round = e;
+        }
+      }
+      if (!round) return null;
+      const roundKey = `${lg.id}:round:${round.value}`;
+      let rDays = gameDayCache.get(roundKey);
+      if (!rDays) {
+        rDays = (async () => {
+          try {
+            const range = `${ymdInTZ(new Date(round.startDate), tz)}-${ymdInTZ(new Date(round.endDate), tz)}`;
+            const data = await api('scoreboard', { dates: range }, lg);
+            return new Set((data?.events || []).map((ev) => ymdInTZ(new Date(ev.date), tz)));
+          } catch { gameDayCache.delete(roundKey); return null; }
+        })();
+        gameDayCache.set(roundKey, rDays);
+      }
+      return rDays;
     }
 
     // Wochenbasiert (NFL/NCAAF): Vergleich über Kalendertage (ymdInTZ), nicht über rohe Zeitstempel.
@@ -624,7 +652,7 @@
     const isFavView = !!(lg.isFav || lg.isLive);
     const isCollege = COLLEGE_IDS.has(state.leagueId);
     el.tabs.querySelectorAll('.tab').forEach((b) => {
-      const hide = (isFavView && b.dataset.tab !== 'scores') || (noNewsTab(lg) && b.dataset.tab === 'news');
+      const hide = (isFavView && b.dataset.tab !== 'scores') || (noNewsTab(lg) && b.dataset.tab === 'news') || (noStandingsTab(lg) && b.dataset.tab === 'standings');
       b.style.display = hide ? 'none' : '';
       const active = b.dataset.tab === state.tab;
       b.classList.toggle('active', active);
@@ -1812,6 +1840,7 @@
     if (tab) state.tab = tab;
     if (lg.isFav || lg.isLive) state.tab = 'scores';
     if (noNewsTab(lg) && state.tab === 'news') state.tab = 'scores';
+    if (noStandingsTab(lg) && state.tab === 'standings') state.tab = 'scores';
     if (changed) { state.standingsConf = null; lastStandings = null; }
     if (lg.cat !== 'fav' && !lg.isLive) { lastLeague[lg.cat] = id; writeJSON(LS_LAST, lastLeague); }
     persist();
