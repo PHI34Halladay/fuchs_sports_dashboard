@@ -329,7 +329,7 @@
 
   // ---------- NHL: Gamecast ----------
   function nhlGamecast(d) {
-    return [lastPlays(d), stars(d), leaderCards(d), flowChart(d), scoringSummary(d), shotChart(d), teamStatsCompare(d, NHL_TEAM_STATS), penaltySummary(d), videoHighlights(d), oddsSection(d), miniStandings(d), gameInfo(d)]
+    return [lastPlays(d), scoringSummary(d), penaltySummary(d), stars(d), leaderCards(d), flowChart(d), shotChart(d), teamStatsCompare(d, NHL_TEAM_STATS), videoHighlights(d), oddsSection(d), miniStandings(d), gameInfo(d)]
       .filter(Boolean).join('');
   }
 
@@ -660,7 +660,7 @@
   ];
 
   function footballGamecast(d) {
-    return [lastPlays(d), leaderCards(d, ['passingYards', 'rushingYards', 'receivingYards']) || footballLeaders(d), flowChart(d), footballScoringSummary(d), teamStatsCompare(d, FOOTBALL_TEAM_STATS), videoHighlights(d), oddsSection(d), miniStandings(d), gameInfo(d)]
+    return [lastPlays(d), footballScoringSummary(d), leaderCards(d, ['passingYards', 'rushingYards', 'receivingYards']) || footballLeaders(d), flowChart(d), teamStatsCompare(d, FOOTBALL_TEAM_STATS), videoHighlights(d), oddsSection(d), miniStandings(d), gameInfo(d)]
       .filter(Boolean).join('');
   }
 
@@ -787,7 +787,7 @@
 
   function soccerGamecast(d) {
     const timeline = soccerTimeline(d);
-    return [leaderCards(d), flowChart(d), timeline || soccerScoringSummary(d), teamStatsCompare(d, SOCCER_TEAM_STATS), videoHighlights(d), oddsSection(d), miniStandings(d), gameInfo(d)]
+    return [timeline || soccerScoringSummary(d), leaderCards(d), flowChart(d), teamStatsCompare(d, SOCCER_TEAM_STATS), videoHighlights(d), oddsSection(d), miniStandings(d), gameInfo(d)]
       .filter(Boolean).join('');
   }
 
@@ -1414,7 +1414,7 @@
 
   // ---------- MLB: Gamecast ----------
   function mlbGamecast(d) {
-    return [lastPlays(d), decisions(d), leaderCards(d), flowChart(d), mlbScoringSummary(d), mlbTeamStatsCompare(d), videoHighlights(d), oddsSection(d), miniStandings(d), gameInfo(d)]
+    return [lastPlays(d), mlbScoringSummary(d), decisions(d), leaderCards(d), flowChart(d), mlbTeamStatsCompare(d), videoHighlights(d), oddsSection(d), miniStandings(d), gameInfo(d)]
       .filter(Boolean).join('');
   }
 
