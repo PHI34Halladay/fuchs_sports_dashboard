@@ -118,7 +118,7 @@ const FILES = {
 };
 
 
-// Nationalmannschaften (z. B. Deutschland-Cup): eigene Flaggen in logos/flags/<code>.png.
+// Nationalmannschaften (z. B. IIHF European Cup of Nations): eigene Flaggen in logos/flags/<code>.png.
 // Mehrere Schreibweisen je Land (deutsch, englisch, Landeskürzel), weil Hockeyweb nicht einheitlich ist.
 const FLAGS = {
   de: ['Deutschland', 'Germany', 'GER', 'DEU'],

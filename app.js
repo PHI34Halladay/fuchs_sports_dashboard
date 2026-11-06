@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '3.8.1';
+  const VERSION = '3.8.2';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -53,7 +53,7 @@
     { id: 'icehl', abbr: 'ICE', name: 'ICEHL', cat: 'hockey', group: 'Europa', hockey: 'icehl', color: '#ff6b6b', logo: 'logos/hockey/icehl.png' },
     { id: 'chl', abbr: 'CHL', name: 'CHL', cat: 'hockey', group: 'Europa', hockey: 'chl', color: '#ffb000', logo: 'logos/hockey/chl.png' },
     { id: 'shl', abbr: 'SHL', name: 'SHL', cat: 'hockey', group: 'Europa', hockey: 'shl', noNews: true, color: '#2fb0ff', logo: 'logos/hockey/shl.png' },
-    { id: 'dcup', abbr: 'DCup', name: 'Deutschland-Cup', cat: 'hockey', group: 'Deutschland', hockey: 'dcup', color: '#e0483e' },
+    { id: 'dcup', abbr: 'IIHF', name: 'IIHF European Cup of Nations', cat: 'hockey', group: 'Europa', hockey: 'dcup', color: '#00b5ff', logo: 'logos/hockey/dcup.png' },
 
     { id: 'mlb', abbr: 'MLB', name: 'MLB', cat: 'baseball', group: 'Profis', sport: 'baseball', league: 'mlb', color: '#4a83e8' },
   ];

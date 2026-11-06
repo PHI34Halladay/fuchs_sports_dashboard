@@ -32,7 +32,7 @@ const LEAGUES = {
   icehl: { name: 'ICEHL', round: 47, api: 40, news: 4, category: /icehl|ice hockey league/i, path: 'icehl' },
   chl: { name: 'CHL', round: 62, api: 4, news: 9, path: 'chl' },
   shl: { name: 'SHL', round: 46, api: 45, news: 4, category: /shl|svenska/i, path: 'shl' },
-  dcup: { name: 'Deutschland-Cup', round: 20, api: 5, news: 10, path: 'deutschland-cup' },
+  dcup: { name: 'IIHF European Cup of Nations', round: 20, api: 5, news: 10, path: 'deutschland-cup' },
 };
 const ROUNDS = Object.fromEntries(Object.entries(LEAGUES).map(([k, v]) => [k, v.round]));
 

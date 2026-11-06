@@ -96,7 +96,7 @@ vom Fussball.de-Logodienst (Hotlink).
 
 ## Eishockey (Hockeyweb)
 
-Das Dropdown „🏒 Eishockey“ in der Liga-Leiste enthält DEL, DEL2, Oberliga Süd, Oberliga Nord, NL (Swiss National League), ICEHL, CHL, SHL und den Deutschland-Cup.
+Das Dropdown „🏒 Eishockey“ in der Liga-Leiste enthält DEL, DEL2, Oberliga Süd, Oberliga Nord, NL (Swiss National League), ICEHL, CHL, SHL und den IIHF European Cup of Nations (bei Hockeyweb unter „Deutschland-Cup“).
 Aufbau wie bei den ESPN-Ligen:
 - **Spiele:** Tagesansicht mit Datumsnavigation (springt von Spieltag zu Spieltag), Live-Stand (Drittel, Zwischenstand, Auto-Refresh), n.V./n.P., Drittelergebnisse, Teamfarben als Kartenhintergrund (Primär-/Sekundärfarbe aus der App-API) und Vereinslogos.
 - **Spiel-Popup** (Karte antippen): Spielverlauf mit Toren (Zwischenstand, Vorlagen) und Strafen, Aufstellung (Torhüter, Reihen, Ersatzbank), Vergleich (Tabellenplatz, Punkte, Tore) und letzte Duelle.
