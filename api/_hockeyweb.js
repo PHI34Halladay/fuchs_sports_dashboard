@@ -12,6 +12,7 @@
 
 const BASE = 'https://www.hockeyweb.de';
 const LOGO_HOST = 'https://media.hockeyweb.de/';
+const { flagFor } = require('./_hockeylogos');
 
 // Nur diese Ligen sind abrufbar (kein offener Proxy). sub = Staffel-Pfad (Oberliga).
 const LEAGUES = {
@@ -132,8 +133,8 @@ function parseGames(html) {
       time,
       played,
       ot: played && marker ? marker[1] : null,
-      home: { name: teamName(imgs[0].alt), logo: imgs[0].src, score: played ? pairs[0][0] : null },
-      away: { name: teamName(imgs[1].alt), logo: imgs[1].src, score: played ? pairs[0][1] : null },
+      home: { name: teamName(imgs[0].alt), logo: flagFor(teamName(imgs[0].alt)) || imgs[0].src, score: played ? pairs[0][0] : null },
+      away: { name: teamName(imgs[1].alt), logo: flagFor(teamName(imgs[1].alt)) || imgs[1].src, score: played ? pairs[0][1] : null },
       periods: pairs.slice(1),
     });
   }
@@ -192,7 +193,7 @@ function parseRow(row) {
   const img = imgsOf(th[1])[0];
   if (!rank || !img || !teamName(img.alt)) return null;
   const [points, played, won, otw, otl, lost, gf, ga] = tds;
-  return { rank: Number(rank[1]), team: teamName(img.alt), logo: img.src, played, won, otw, otl, lost, gf, ga, diff: gf - ga, points };
+  return { rank: Number(rank[1]), team: teamName(img.alt), logo: flagFor(teamName(img.alt)) || img.src, played, won, otw, otl, lost, gf, ga, diff: gf - ga, points };
 }
 
 // Gruppen anhand der <h2>-Überschriften ("Süd", "Nord", "Hauptrunde" …); ohne Überschrift eine Gruppe.

@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '3.8.0';
+  const VERSION = '3.8.1';
 
   // ---------- Konfiguration ----------
   const FAV_ID = 'fav';
@@ -1435,7 +1435,7 @@
   const hockeyNews = (lg) => hockeyFetch({ league: lg.hockey, type: 'news' });
   const hockeyGameCache = new Map(); // "liga:spielId" → Spiel (für das Detail-Popup)
 
-  const hwLogoOk = (url) => !!url && String(url).startsWith('https://media.hockeyweb.de/');
+  const hwLogoOk = (url) => !!url && (String(url).startsWith('https://media.hockeyweb.de/') || String(url).startsWith('logos/flags/'));
   const hwLogo = (url) => (hwLogoOk(url) ? `<img src="${esc(url)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '');
 
   async function loadHockey({ silent = false } = {}) {

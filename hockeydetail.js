@@ -7,7 +7,7 @@
 
   const REFRESH_MS = 20_000;
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const logoOk = (u) => !!u && String(u).startsWith('https://media.hockeyweb.de/');
+  const logoOk = (u) => !!u && (String(u).startsWith('https://media.hockeyweb.de/') || String(u).startsWith('logos/flags/'));
   const logo = (u) => (logoOk(u) ? `<img src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="hd-nologo"></span>');
   const PERIOD = { 1: '1. Drittel', 2: '2. Drittel', 3: '3. Drittel', 4: 'Verlängerung', 5: 'Penaltyschießen' };
 

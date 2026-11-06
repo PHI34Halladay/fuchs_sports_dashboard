@@ -117,14 +117,52 @@ const FILES = {
  "Herner EV": "herner-ev-miners-logo-png"
 };
 
+
+// Nationalmannschaften (z. B. Deutschland-Cup): eigene Flaggen in logos/flags/<code>.png.
+// Mehrere Schreibweisen je Land (deutsch, englisch, Landeskürzel), weil Hockeyweb nicht einheitlich ist.
+const FLAGS = {
+  de: ['Deutschland', 'Germany', 'GER', 'DEU'],
+  at: ['Österreich', 'Austria', 'AUT'],
+  lv: ['Lettland', 'Latvia', 'LAT', 'LVA'],
+  sk: ['Slowakei', 'Slovakia', 'SVK'],
+  es: ['Spanien', 'Spain', 'ESP'],
+  lt: ['Litauen', 'Lithuania', 'LTU'],
+  no: ['Norwegen', 'Norway', 'NOR'],
+  hu: ['Ungarn', 'Hungary', 'HUN'],
+  ua: ['Ukraine', 'UKR'],
+  gb: ['Großbritannien', 'Great Britain', 'GB', 'GBR', 'England', 'Vereinigtes Königreich', 'United Kingdom'],
+  ro: ['Rumänien', 'Romania', 'ROU', 'ROM'],
+  ee: ['Estland', 'Estonia', 'EST'],
+  pl: ['Polen', 'Poland', 'POL'],
+  it: ['Italien', 'Italy', 'ITA'],
+  si: ['Slowenien', 'Slovenia', 'SLO', 'SVN'],
+  fr: ['Frankreich', 'France', 'FRA'],
+};
+
 // Name normalisieren: Kleinbuchstaben, ohne Umlaute/Akzente und Sonderzeichen
 const norm = (s) => String(s || '').toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
   .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '');
 const INDEX = new Map(Object.keys(FILES).map((n) => [norm(n), FILES[n]]));
+const FLAG_INDEX = new Map();
+for (const [code, names] of Object.entries(FLAGS)) names.forEach((n) => FLAG_INDEX.set(norm(n), code));
+
+// Flagge zu einem Teamnamen: exakter Treffer oder Name mit Zusatz wie „Deutschland U20“ / „Team Austria“
+function flagFor(name) {
+  const n = norm(name);
+  if (!n) return null;
+  let code = FLAG_INDEX.get(n);
+  if (!code) {
+    const words = String(name).split(/[\s\-–/()]+/).map(norm).filter(Boolean);
+    for (const w of words) if (w.length > 3 && FLAG_INDEX.has(w)) { code = FLAG_INDEX.get(w); break; }
+  }
+  return code ? `logos/flags/${code}.png` : null;
+}
 
 function logoFor(name) {
+  const flag = flagFor(name);
+  if (flag) return flag;
   const f = INDEX.get(norm(name));
   return f ? `${LOGO_BASE}${encodeURI(f)}-ls.webp` : null;
 }
 
-module.exports = { logoFor, norm };
+module.exports = { logoFor, flagFor, norm };
